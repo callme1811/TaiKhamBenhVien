@@ -61,7 +61,7 @@ def prepare_and_train_model(df):
 
     categorical_transformer = Pipeline([
         ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse=False))
     ])
 
     preprocessor = ColumnTransformer([
@@ -159,10 +159,10 @@ if page == "Trang 1: Giới thiệu & EDA":
 
     st.subheader("1. Thông tin bài toán")
     st.markdown("""
-**Tên đề tài:** Phân loại nguy cơ tái nhập viện của bệnh nhân đái tháo đường bằng Naive Bayes  
+**Tên đề tài:** Phân loại nguy cơ tái nhập viện của bệnh nhân đái tháo đường bằng Naive Bayes
 
 **Họ tên SV:** Nguyễn Trọng Quý  
-**MSSV:** 22T1020719
+**MSSV:** SV22T1020639
 
 **Mô tả ngắn gọn giá trị thực tiễn:**  
 Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập viện, từ đó giúp bác sĩ và bệnh viện theo dõi sát hơn, can thiệp kịp thời và tối ưu phân bổ nguồn lực.
@@ -172,10 +172,10 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
     st.write("Kích thước dữ liệu:", df.shape)
     st.dataframe(df.head(10), use_container_width=True)
 
-    c1, c2 = st.columns(2)
-    with c1:
+    col1, col2 = st.columns(2)
+    with col1:
         st.write("Số dòng:", df.shape[0])
-    with c2:
+    with col2:
         st.write("Số cột:", df.shape[1])
 
     st.subheader("3. Kiểm tra dữ liệu thiếu")
@@ -187,9 +187,9 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
 
     st.subheader("4. Các biểu đồ phân tích")
 
-    c1, c2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with c1:
+    with col1:
         st.markdown("**Biểu đồ 1: Phân bố nhãn readmitted**")
         fig1, ax1 = plt.subplots()
         df["readmitted"].value_counts().plot(kind="bar", ax=ax1)
@@ -198,7 +198,7 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
         ax1.set_title("Phân bố nhãn")
         st.pyplot(fig1)
 
-    with c2:
+    with col2:
         st.markdown("**Biểu đồ 2: Phân bố theo tuổi**")
         fig2, ax2 = plt.subplots()
         df["age"].value_counts().sort_index().plot(kind="bar", ax=ax2)
@@ -251,38 +251,44 @@ elif page == "Trang 2: Triển khai mô hình":
 
     st.subheader("2. Xử lý logic")
     st.markdown("""
-- Ứng dụng sử dụng mô hình **Naive Bayes đã được huấn luyện trước** và lưu dưới dạng file `.pkl`.
-- Bộ tiền xử lý dữ liệu cũng được lưu riêng để bảo đảm dữ liệu nhập vào được xử lý giống lúc huấn luyện.
-- Dữ liệu đầu vào được tách thành biến số và biến phân loại.
-- Biến số được điền giá trị thiếu bằng **median**.
-- Biến phân loại được điền giá trị thiếu bằng **most frequent** và mã hóa bằng **OneHotEncoder**.
+- Ứng dụng sử dụng mô hình **Naive Bayes đã được huấn luyện trước**
+- Dữ liệu được xử lý bằng Pipeline (imputer + encoder)
+- Numeric → median
+- Categorical → most frequent + OneHotEncoder
 """)
 
-    st.subheader("3. Hiển thị kết quả")
+    st.subheader("3. Pipeline")
+    st.markdown("""
+Dữ liệu → Tiền xử lý → Train/Test → Naive Bayes → Dự đoán → Đánh giá
+""")
+
+    st.subheader("4. Hiển thị kết quả")
+
     if st.button("Dự đoán nguy cơ tái nhập viện"):
         X_input = preprocessor.transform(input_df)
         pred = model.predict(X_input)[0]
         label = label_encoder.inverse_transform([pred])[0]
 
         if str(label).lower() in ["yes", "readmitted", "1", "<30", ">30"]:
-            st.error("Kết quả phân loại: Bệnh nhân có nguy cơ tái nhập viện")
+            st.error("Kết quả: Bệnh nhân có nguy cơ tái nhập viện")
         else:
-            st.success("Kết quả phân loại: Bệnh nhân không có nguy cơ tái nhập viện")
+            st.success("Kết quả: Bệnh nhân không có nguy cơ tái nhập viện")
 
         if len(label_encoder.classes_) == 2:
             prob = model.predict_proba(X_input)[0][1]
-            st.write(f"Xác suất thuộc nhóm nguy cơ tái nhập viện: **{prob:.2%}**")
+            st.write(f"Xác suất: **{prob:.2%}**")
             st.progress(float(prob))
+
 
 elif page == "Trang 3: Đánh giá hiệu năng":
     st.header("Trang 3: Đánh giá hiệu năng")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Accuracy", f"{metrics['accuracy']:.4f}")
-    c2.metric("Precision", f"{metrics['precision']:.4f}")
-    c3.metric("Recall", f"{metrics['recall']:.4f}")
-    c4.metric("F1-score", f"{metrics['f1']:.4f}")
-    c5.metric("AUC-ROC", f"{metrics['auc']:.4f}" if metrics["auc"] is not None else "N/A")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Accuracy", f"{metrics['accuracy']:.4f}")
+    col2.metric("Precision", f"{metrics['precision']:.4f}")
+    col3.metric("Recall", f"{metrics['recall']:.4f}")
+    col4.metric("F1-score", f"{metrics['f1']:.4f}")
+    col5.metric("AUC-ROC", f"{metrics['auc']:.4f}" if metrics["auc"] is not None else "N/A")
 
     st.subheader("1. Confusion Matrix")
     fig_cm, ax_cm = plt.subplots()
@@ -310,23 +316,10 @@ elif page == "Trang 3: Đánh giá hiệu năng":
 
     st.subheader("4. Phân tích sai số")
     st.markdown("""
-- Mô hình có thể dự đoán sai ở những trường hợp bệnh nhân có đặc điểm gần giống nhau giữa hai nhóm tái nhập viện và không tái nhập viện.
-- Nguyên nhân là Naive Bayes giả định các đặc trưng độc lập với nhau, trong khi dữ liệu y tế thực tế thường có mối liên hệ giữa nhiều yếu tố như số lần nhập viện, thời gian nằm viện và kết quả xét nghiệm.
-- Nếu dữ liệu bị mất cân bằng giữa các lớp, mô hình cũng có thể thiên về lớp xuất hiện nhiều hơn.
-- Để cải thiện, có thể thử:
-  - Cân bằng dữ liệu bằng oversampling hoặc undersampling
-  - Chọn lọc đặc trưng quan trọng hơn
-  - So sánh với các mô hình khác như Logistic Regression, Random Forest hoặc XGBoost
-""")
-
-    st.subheader("5. Nhận xét")
-    st.markdown("""
-- **Accuracy** cho biết tỷ lệ dự đoán đúng trên toàn bộ tập kiểm tra.
-- **Precision** phản ánh mức độ chính xác khi mô hình dự đoán bệnh nhân thuộc nhóm có nguy cơ tái nhập viện.
-- **Recall** cho biết mô hình phát hiện được bao nhiêu trường hợp thật sự có nguy cơ.
-- **F1-score** là chỉ số cân bằng giữa Precision và Recall.
-- **AUC-ROC** thể hiện khả năng phân biệt giữa các lớp của mô hình.
-
-**Kết luận:**  
-Mô hình Naive Bayes có ưu điểm là đơn giản, tốc độ huấn luyện nhanh và phù hợp với bài toán phân loại dữ liệu y tế. Tuy nhiên, do giả định các đặc trưng độc lập với nhau nên độ chính xác có thể chưa tối ưu so với một số mô hình mạnh hơn.
+- Naive Bayes giả định các biến độc lập → có thể sai với dữ liệu y tế
+- Dữ liệu mất cân bằng → model bias
+- Có thể cải thiện bằng:
+  + SMOTE / oversampling
+  + Feature selection
+  + Thử Logistic Regression, Random Forest, XGBoost
 """)
