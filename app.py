@@ -41,7 +41,7 @@ def load_data():
     return pd.read_csv("hospital_readmissions.csv")
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def prepare_and_train_model(df):
     data = df.copy()
 
@@ -52,8 +52,8 @@ def prepare_and_train_model(df):
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
 
-    categorical_cols = X.select_dtypes(include=["object"]).columns.tolist()
-    numeric_cols = X.select_dtypes(exclude=["object"]).columns.tolist()
+    categorical_cols = X.select_dtypes(include=["object", "string"]).columns.tolist()
+    numeric_cols = X.select_dtypes(exclude=["object", "string"]).columns.tolist()
 
     numeric_transformer = Pipeline([
         ("imputer", SimpleImputer(strategy="median"))
@@ -61,7 +61,7 @@ def prepare_and_train_model(df):
 
     categorical_transformer = Pipeline([
         ("imputer", SimpleImputer(strategy="most_frequent")),
-        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse=False))
+        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
     ])
 
     preprocessor = ColumnTransformer([
@@ -91,8 +91,16 @@ def prepare_and_train_model(df):
     return model, preprocessor, label_encoder, X_train, X_test, y_train, y_test, categorical_cols, numeric_cols
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_or_train_model(df):
+    data = df.copy()
+    target_col = "readmitted"
+    X = data.drop(columns=[target_col])
+    y = data[target_col].astype(str)
+
+    categorical_cols = X.select_dtypes(include=["object", "string"]).columns.tolist()
+    numeric_cols = X.select_dtypes(exclude=["object", "string"]).columns.tolist()
+
     if (
         os.path.exists(MODEL_PATH)
         and os.path.exists(PREPROCESSOR_PATH)
@@ -102,14 +110,7 @@ def load_or_train_model(df):
         preprocessor = joblib.load(PREPROCESSOR_PATH)
         label_encoder = joblib.load(LABEL_ENCODER_PATH)
 
-        data = df.copy()
-        target_col = "readmitted"
-        X = data.drop(columns=[target_col])
-        y = data[target_col].astype(str)
         y_encoded = label_encoder.transform(y)
-
-        categorical_cols = X.select_dtypes(include=["object"]).columns.tolist()
-        numeric_cols = X.select_dtypes(exclude=["object"]).columns.tolist()
 
         X_train, X_test, y_train, y_test = train_test_split(
             X,
@@ -162,7 +163,7 @@ if page == "Trang 1: Giới thiệu & EDA":
 **Tên đề tài:** Phân loại nguy cơ tái nhập viện của bệnh nhân đái tháo đường bằng Naive Bayes
 
 **Họ tên SV:** Nguyễn Trọng Quý  
-**MSSV:**  22T1020719
+**MSSV:** 22T1020719
 
 **Mô tả ngắn gọn giá trị thực tiễn:**  
 Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập viện, từ đó giúp bác sĩ và bệnh viện theo dõi sát hơn, can thiệp kịp thời và tối ưu phân bổ nguồn lực.
@@ -278,7 +279,6 @@ Dữ liệu → Tiền xử lý → Train/Test → Naive Bayes → Dự đoán �
             prob = model.predict_proba(X_input)[0][1]
             st.write(f"Xác suất: **{prob:.2%}**")
             st.progress(float(prob))
-
 
 elif page == "Trang 3: Đánh giá hiệu năng":
     st.header("Trang 3: Đánh giá hiệu năng")
