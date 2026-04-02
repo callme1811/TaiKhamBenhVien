@@ -162,7 +162,7 @@ if page == "Trang 1: Giới thiệu & EDA":
 **Tên đề tài:** Phân loại nguy cơ tái nhập viện của bệnh nhân đái tháo đường bằng Naive Bayes
 
 **Họ tên SV:** Nguyễn Trọng Quý  
-**MSSV:** SV22T1020639
+**MSSV:**  22T1020719
 
 **Mô tả ngắn gọn giá trị thực tiễn:**  
 Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập viện, từ đó giúp bác sĩ và bệnh viện theo dõi sát hơn, can thiệp kịp thời và tối ưu phân bổ nguồn lực.
