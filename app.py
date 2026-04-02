@@ -158,7 +158,7 @@ page = st.sidebar.radio(
 if page == "Trang 1: Giới thiệu & EDA":
     st.header("Trang 1: Giới thiệu & Khám phá dữ liệu (EDA)")
 
-    st.subheader("1. Thông tin bài toán")
+    st.markdown("## 1. Thông tin bài toán")
     st.markdown("""
 **Tên đề tài:** Phân loại nguy cơ tái nhập viện của bệnh nhân đái tháo đường bằng Naive Bayes
 
@@ -169,9 +169,9 @@ if page == "Trang 1: Giới thiệu & EDA":
 Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập viện, từ đó giúp bác sĩ và bệnh viện theo dõi sát hơn, can thiệp kịp thời và tối ưu phân bổ nguồn lực.
 """)
 
-    st.subheader("2. Xem dữ liệu")
+    st.markdown("## 2. Xem dữ liệu")
     st.write("Kích thước dữ liệu:", df.shape)
-    st.dataframe(df.head(10), use_container_width=True)
+    st.dataframe(df.head(10), width="stretch")
 
     col1, col2 = st.columns(2)
     with col1:
@@ -179,19 +179,19 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
     with col2:
         st.write("Số cột:", df.shape[1])
 
-    st.subheader("3. Kiểm tra dữ liệu thiếu")
+    st.markdown("## 3. Kiểm tra dữ liệu thiếu")
     missing_df = pd.DataFrame({
         "Tên cột": df.columns,
         "Số giá trị thiếu": df.isnull().sum().values
     })
-    st.dataframe(missing_df, use_container_width=True)
+    st.dataframe(missing_df, width="stretch")
 
-    st.subheader("4. Các biểu đồ phân tích")
+    st.markdown("## 4. Các biểu đồ phân tích")
 
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("**Biểu đồ 1: Phân bố nhãn readmitted**")
+        st.markdown("### Biểu đồ 1: Phân bố nhãn readmitted")
         fig1, ax1 = plt.subplots()
         df["readmitted"].value_counts().plot(kind="bar", ax=ax1)
         ax1.set_xlabel("readmitted")
@@ -200,7 +200,7 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
         st.pyplot(fig1)
 
     with col2:
-        st.markdown("**Biểu đồ 2: Phân bố theo tuổi**")
+        st.markdown("### Biểu đồ 2: Phân bố theo tuổi")
         fig2, ax2 = plt.subplots()
         df["age"].value_counts().sort_index().plot(kind="bar", ax=ax2)
         ax2.set_xlabel("Nhóm tuổi")
@@ -208,7 +208,7 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
         ax2.set_title("Phân bố nhóm tuổi")
         st.pyplot(fig2)
 
-    st.markdown("**Biểu đồ 3: Thời gian nằm viện trung bình theo nhãn readmitted**")
+    st.markdown("### Biểu đồ 3: Thời gian nằm viện trung bình theo nhãn readmitted")
     fig3, ax3 = plt.subplots()
     avg_time = df.groupby("readmitted")["time_in_hospital"].mean()
     avg_time.plot(kind="bar", ax=ax3)
@@ -217,7 +217,7 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
     ax3.set_title("So sánh time_in_hospital theo nhãn")
     st.pyplot(fig3)
 
-    st.subheader("5. Nhận xét dữ liệu")
+    st.markdown("## 5. Nhận xét dữ liệu")
     st.markdown("""
 - Dữ liệu có cột mục tiêu là **readmitted**, dùng để xác định bệnh nhân có nguy cơ tái nhập viện hay không.
 - Bộ dữ liệu gồm cả biến số và biến phân loại như: **age, time_in_hospital, n_lab_procedures, medical_specialty, glucose_test, A1Ctest...**
@@ -226,10 +226,18 @@ Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập vi
 - Dữ liệu có ý nghĩa thực tiễn vì hỗ trợ bệnh viện sàng lọc sớm các trường hợp nguy cơ cao để có kế hoạch theo dõi và điều trị phù hợp.
 """)
 
+    st.markdown("## 6. Giải thích dữ liệu")
+    st.markdown("""
+- Nhãn **readmitted** xác định bệnh nhân có tái nhập viện hay không.
+- Các yếu tố như thời gian nằm viện, số lần nhập viện, xét nghiệm và chẩn đoán có thể ảnh hưởng đến kết quả phân loại.
+- Dữ liệu y tế thường có mối liên hệ giữa nhiều biến, vì vậy việc tiền xử lý và chọn mô hình phù hợp là rất quan trọng.
+""")
+
 elif page == "Trang 2: Triển khai mô hình":
     st.header("Trang 2: Triển khai mô hình")
 
-    st.subheader("1. Nhập dữ liệu bệnh nhân")
+    st.markdown("## 1. Nhập dữ liệu bệnh nhân")
+    note = st.text_input("Ghi chú bệnh nhân (tuỳ chọn)")
     input_data = {}
 
     for col in numeric_cols:
@@ -250,25 +258,29 @@ elif page == "Trang 2: Triển khai mô hình":
 
     input_df = pd.DataFrame([input_data])
 
-    st.subheader("2. Xử lý logic")
+    st.markdown("## 2. Xử lý logic")
     st.markdown("""
-- Ứng dụng sử dụng mô hình **Naive Bayes đã được huấn luyện trước**
-- Dữ liệu được xử lý bằng Pipeline (imputer + encoder)
-- Numeric → median
-- Categorical → most frequent + OneHotEncoder
+- Ứng dụng sử dụng mô hình **Naive Bayes đã được huấn luyện trước** và lưu dưới dạng file `.pkl`.
+- Dữ liệu được xử lý bằng **Pipeline** gồm bước điền giá trị thiếu và mã hóa dữ liệu.
+- Với biến số: dùng **median** để thay thế giá trị thiếu.
+- Với biến phân loại: dùng **most frequent** và **OneHotEncoder**.
+- Quá trình xử lý dữ liệu khi dự đoán được giữ giống lúc huấn luyện mô hình.
 """)
 
-    st.subheader("3. Pipeline")
+    st.markdown("## 3. Pipeline")
     st.markdown("""
 Dữ liệu → Tiền xử lý → Train/Test → Naive Bayes → Dự đoán → Đánh giá
 """)
 
-    st.subheader("4. Hiển thị kết quả")
+    st.markdown("## 4. Hiển thị kết quả")
 
     if st.button("Dự đoán nguy cơ tái nhập viện"):
         X_input = preprocessor.transform(input_df)
         pred = model.predict(X_input)[0]
         label = label_encoder.inverse_transform([pred])[0]
+
+        if note:
+            st.write("**Ghi chú bệnh nhân:**", note)
 
         if str(label).lower() in ["yes", "readmitted", "1", "<30", ">30"]:
             st.error("Kết quả: Bệnh nhân có nguy cơ tái nhập viện")
@@ -290,7 +302,16 @@ elif page == "Trang 3: Đánh giá hiệu năng":
     col4.metric("F1-score", f"{metrics['f1']:.4f}")
     col5.metric("AUC-ROC", f"{metrics['auc']:.4f}" if metrics["auc"] is not None else "N/A")
 
-    st.subheader("1. Confusion Matrix")
+    st.markdown("## 0. Giải thích chỉ số")
+    st.markdown("""
+- **Accuracy:** tỷ lệ dự đoán đúng trên toàn bộ dữ liệu kiểm tra.
+- **Precision:** độ chính xác khi mô hình dự đoán bệnh nhân thuộc nhóm nguy cơ.
+- **Recall:** khả năng phát hiện đúng các bệnh nhân thật sự có nguy cơ tái nhập viện.
+- **F1-score:** chỉ số cân bằng giữa Precision và Recall.
+- **AUC-ROC:** khả năng phân biệt giữa hai lớp của mô hình.
+""")
+
+    st.markdown("## 1. Confusion Matrix")
     fig_cm, ax_cm = plt.subplots()
     cm = confusion_matrix(y_test, y_pred)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
@@ -298,7 +319,7 @@ elif page == "Trang 3: Đánh giá hiệu năng":
     st.pyplot(fig_cm)
 
     if y_prob is not None:
-        st.subheader("2. ROC Curve")
+        st.markdown("## 2. ROC Curve")
         fpr, tpr, _ = roc_curve(y_test, y_prob)
         fig_roc, ax_roc = plt.subplots()
         ax_roc.plot(fpr, tpr, label=f"AUC = {metrics['auc']:.4f}")
@@ -309,17 +330,25 @@ elif page == "Trang 3: Đánh giá hiệu năng":
         ax_roc.legend()
         st.pyplot(fig_roc)
 
-    st.subheader("3. Báo cáo phân loại")
+    st.markdown("## 3. Báo cáo phân loại")
     report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
     report_df = pd.DataFrame(report).transpose()
-    st.dataframe(report_df, use_container_width=True)
+    st.dataframe(report_df, width="stretch")
 
-    st.subheader("4. Phân tích sai số")
+    st.markdown("## 4. Phân tích sai số")
     st.markdown("""
-- Naive Bayes giả định các biến độc lập → có thể sai với dữ liệu y tế
-- Dữ liệu mất cân bằng → model bias
+- Naive Bayes giả định các biến độc lập nên có thể chưa phản ánh đầy đủ mối liên hệ giữa các yếu tố trong dữ liệu y tế.
+- Nếu dữ liệu bị mất cân bằng giữa các lớp, mô hình có thể bị thiên lệch về lớp xuất hiện nhiều hơn.
+- Các trường hợp bệnh nhân có đặc điểm gần giống nhau giữa hai nhóm có thể dễ bị phân loại sai.
 - Có thể cải thiện bằng:
   + SMOTE / oversampling
   + Feature selection
   + Thử Logistic Regression, Random Forest, XGBoost
+""")
+
+    st.markdown("## 5. Nhận xét")
+    st.markdown("""
+- Mô hình Naive Bayes có ưu điểm là đơn giản, huấn luyện nhanh và dễ triển khai.
+- Ứng dụng đáp ứng yêu cầu cơ bản của bài toán phân loại nguy cơ tái nhập viện.
+- Để nâng cao độ chính xác trong thực tế, có thể so sánh thêm với các mô hình mạnh hơn.
 """)
