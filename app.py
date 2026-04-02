@@ -34,7 +34,7 @@ st.title("Ứng dụng mô hình Naive Bayes dự đoán nguy cơ tái nhập vi
 # =========================
 @st.cache_data
 def load_data():
-    file_path = r"D:\Machine with python\customer\TaiKhamBenhVien\TaiKhamBenhVien\hospital_readmissions.csv"
+    file_path = "hospital_readmissions.csv"
     if os.path.exists(file_path):
         df = pd.read_csv(file_path)
         return df
