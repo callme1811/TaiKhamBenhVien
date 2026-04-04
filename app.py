@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler, LabelEncoder
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -21,7 +21,8 @@ from sklearn.metrics import (
     roc_curve,
     classification_report
 )
-from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.calibration import CalibratedClassifierCV
 
 
 # =========================================================
@@ -87,33 +88,33 @@ html, body, [class*="css"] {
 }
 
 .card {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: white;
+    border: 1px solid rgba(15,23,42,0.06);
     border-radius: 18px;
     padding: 18px 20px;
     margin-bottom: 16px;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.10);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.06);
 }
 
 .metric-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    border: 1px solid rgba(15,23,42,0.08);
     border-radius: 18px;
     padding: 16px 14px;
     text-align: center;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.10);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.06);
 }
 
 .metric-label {
     font-size: 14px;
-    color: #cbd5e1;
+    color: #475569;
     margin-bottom: 6px;
 }
 
 .metric-value {
     font-size: 26px;
     font-weight: 800;
-    color: white;
+    color: #0f172a;
 }
 
 .small-muted {
@@ -123,9 +124,9 @@ html, body, [class*="css"] {
 
 .info-chip {
     display: inline-block;
-    background: rgba(37,99,235,0.18);
-    color: #bfdbfe;
-    border: 1px solid rgba(59,130,246,0.35);
+    background: rgba(37,99,235,0.10);
+    color: #1d4ed8;
+    border: 1px solid rgba(59,130,246,0.20);
     padding: 6px 12px;
     border-radius: 999px;
     font-size: 13px;
@@ -142,7 +143,7 @@ div.stButton > button {
     font-weight: 700;
     background: linear-gradient(135deg, #2563eb, #1d4ed8);
     color: white;
-    box-shadow: 0 10px 20px rgba(37,99,235,0.28);
+    box-shadow: 0 10px 20px rgba(37,99,235,0.20);
 }
 
 div.stButton > button:hover {
@@ -179,9 +180,11 @@ st.markdown("""
 # =========================================================
 DATA_PATH = "hospital_readmissions.csv"
 MODEL_DIR = "models"
-MODEL_PATH = os.path.join(MODEL_DIR, "gaussian_nb_model.pkl")
-PREPROCESSOR_PATH = os.path.join(MODEL_DIR, "preprocessor.pkl")
-LABEL_ENCODER_PATH = os.path.join(MODEL_DIR, "label_encoder.pkl")
+
+# đổi tên file model để tránh load nhầm model GaussianNB cũ
+MODEL_PATH = os.path.join(MODEL_DIR, "multinomial_nb_calibrated_model.pkl")
+PREPROCESSOR_PATH = os.path.join(MODEL_DIR, "preprocessor_nb.pkl")
+LABEL_ENCODER_PATH = os.path.join(MODEL_DIR, "label_encoder_nb.pkl")
 
 
 # =========================================================
@@ -215,8 +218,6 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
 
     if "readmitted" in data.columns:
         data["readmitted"] = data["readmitted"].astype(str).str.strip()
-        # Đúng bài toán tái nhập viện sớm:
-        # <30 = YES ; >30, NO = NO
         data["readmitted"] = data["readmitted"].replace({
             "<30": "YES",
             ">30": "NO",
@@ -279,6 +280,20 @@ def add_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     return data
 
 
+def clip_input_by_train_range(input_df: pd.DataFrame, X_train: pd.DataFrame, numeric_cols):
+    data = input_df.copy()
+
+    for col in numeric_cols:
+        if col in data.columns and col in X_train.columns:
+            train_col = pd.to_numeric(X_train[col], errors="coerce").dropna()
+            if len(train_col) > 0:
+                low = float(train_col.quantile(0.01))
+                high = float(train_col.quantile(0.99))
+                data[col] = pd.to_numeric(data[col], errors="coerce").clip(lower=low, upper=high)
+
+    return data
+
+
 @st.cache_data
 def load_data():
     if not os.path.exists(DATA_PATH):
@@ -294,13 +309,43 @@ def build_default_values(X_train: pd.DataFrame, numeric_cols, categorical_cols):
     defaults = {}
 
     for col in numeric_cols:
-        defaults[col] = float(pd.to_numeric(X_train[col], errors="coerce").median())
+        series = pd.to_numeric(X_train[col], errors="coerce").dropna()
+        defaults[col] = float(series.median()) if len(series) > 0 else 0.0
 
     for col in categorical_cols:
         mode_val = safe_mode(X_train[col].astype(str))
         defaults[col] = str(mode_val) if mode_val is not None else "Unknown"
 
     return defaults
+
+
+def build_input_limits(X_train: pd.DataFrame, numeric_cols):
+    limits = {}
+
+    for col in numeric_cols:
+        series = pd.to_numeric(X_train[col], errors="coerce").dropna()
+        if len(series) > 0:
+            q01 = float(series.quantile(0.01))
+            q99 = float(series.quantile(0.99))
+            q50 = float(series.median())
+
+            if q01 == q99:
+                q01 = float(series.min())
+                q99 = float(series.max())
+
+            limits[col] = {
+                "min": q01,
+                "max": q99,
+                "default": q50
+            }
+        else:
+            limits[col] = {
+                "min": 0.0,
+                "max": 100.0,
+                "default": 0.0
+            }
+
+    return limits
 
 
 @st.cache_resource(show_spinner=False)
@@ -323,7 +368,8 @@ def prepare_and_train_model(df: pd.DataFrame):
     numeric_cols = X.select_dtypes(exclude=["object", "string"]).columns.tolist()
 
     numeric_transformer = Pipeline([
-        ("imputer", SimpleImputer(strategy="median"))
+        ("imputer", SimpleImputer(strategy="median")),
+        ("scaler", MinMaxScaler())
     ])
 
     categorical_transformer = Pipeline([
@@ -352,7 +398,8 @@ def prepare_and_train_model(df: pd.DataFrame):
     if hasattr(X_test_processed, "toarray"):
         X_test_processed = X_test_processed.toarray()
 
-    model = GaussianNB()
+    base_model = MultinomialNB(alpha=1.0)
+    model = CalibratedClassifierCV(base_model, method="sigmoid", cv=3)
     model.fit(X_train_processed, y_train)
 
     os.makedirs(MODEL_DIR, exist_ok=True)
@@ -404,6 +451,7 @@ def load_or_train_model(df: pd.DataFrame):
 
 def evaluate_model(model, preprocessor, X_test, y_test, threshold=0.5):
     X_test_processed = preprocessor.transform(X_test)
+
     if hasattr(X_test_processed, "toarray"):
         X_test_processed = X_test_processed.toarray()
 
@@ -448,6 +496,7 @@ df = load_data()
 ) = load_or_train_model(df)
 
 default_values = build_default_values(X_train, numeric_cols, categorical_cols)
+input_limits = build_input_limits(X_train, numeric_cols)
 
 st.sidebar.markdown("## Điều hướng")
 st.sidebar.markdown("<div class='small-muted'>Chọn nội dung muốn xem</div>", unsafe_allow_html=True)
@@ -473,9 +522,9 @@ threshold = st.sidebar.slider(
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Thông tin mô hình")
-st.sidebar.markdown("**Thuật toán:** Gaussian Naive Bayes")
+st.sidebar.markdown("**Thuật toán:** Multinomial Naive Bayes + Calibration")
 st.sidebar.markdown("**Bài toán:** Phân loại nhị phân")
-st.sidebar.markdown("**Mục tiêu:** Dự đoán tái nhập viện sớm ")
+st.sidebar.markdown("**Mục tiêu:** Dự đoán tái nhập viện sớm")
 st.sidebar.markdown(f"**Ngưỡng hiện tại:** {threshold:.2f}")
 st.sidebar.markdown(f"**Nguồn dữ liệu:** {DATA_PATH}")
 
@@ -494,7 +543,7 @@ if page == "Giới thiệu & EDA":
     <div class="card">
         <h3>1. Thông tin bài toán</h3>
         <p><b>Tên đề tài:</b> Phân loại nguy cơ tái nhập viện sớm của bệnh nhân đái tháo đường bằng Naive Bayes</p>
-        <p><b>Bản chất bài toán:</b> Phân loại nhị phân, trong đó <b>YES</b> là bệnh nhân tái nhập viện sớm , <b>NO</b> là còn lại.</p>
+        <p><b>Bản chất bài toán:</b> Phân loại nhị phân, trong đó <b>YES</b> là bệnh nhân tái nhập viện sớm, <b>NO</b> là còn lại.</p>
         <p><b>Giá trị thực tiễn:</b> Mô hình hỗ trợ nhận diện sớm bệnh nhân có nguy cơ quay lại bệnh viện trong thời gian ngắn, giúp bác sĩ theo dõi sát hơn và hỗ trợ phân bổ nguồn lực điều trị hợp lý hơn.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -566,7 +615,7 @@ if page == "Giới thiệu & EDA":
         <h3>5. Nhận xét dữ liệu</h3>
         <ul>
             <li>Dữ liệu gồm cả biến số và biến phân loại.</li>
-            <li>Cột mục tiêu là <b>readmitted</b>, đã được quy đổi thành bài toán nhị phân cho mục tiêu phát hiện tái nhập viện sớm.</li>
+            <li>Cột mục tiêu là <b>readmitted</b>, đã được quy đổi thành bài toán nhị phân để phát hiện tái nhập viện sớm.</li>
             <li>Một số đặc trưng như thời gian nằm viện, số thuốc, số lần nhập viện và số xét nghiệm có thể liên quan đến nguy cơ tái nhập viện.</li>
             <li>Dữ liệu có giá trị thiếu nên cần bước tiền xử lý trước khi huấn luyện mô hình.</li>
         </ul>
@@ -577,7 +626,7 @@ if page == "Giới thiệu & EDA":
     <div class="card">
         <h3>6. Giải thích bài toán</h3>
         <ul>
-            <li><b>YES</b>: bệnh nhân tái nhập viện sớm .</li>
+            <li><b>YES</b>: bệnh nhân tái nhập viện sớm.</li>
             <li><b>NO</b>: bệnh nhân không tái nhập viện sớm.</li>
             <li>Mục tiêu của mô hình là phát hiện sớm nhóm nguy cơ để ưu tiên theo dõi.</li>
         </ul>
@@ -594,8 +643,8 @@ elif page == "Triển khai mô hình":
     st.markdown("""
     <div class="card">
         <h3>1. Mô tả quy trình xử lý</h3>
-        <p>Dữ liệu đầu vào được làm sạch, tạo thêm đặc trưng mới, xử lý giá trị thiếu, mã hóa biến phân loại, sau đó đưa vào mô hình Gaussian Naive Bayes để dự đoán xác suất tái nhập viện sớm.</p>
-        <p><b>Pipeline:</b> Làm sạch dữ liệu → Feature Engineering → Tiền xử lý → Train/Test Split → GaussianNB → Dự đoán xác suất → Phân lớp theo threshold</p>
+        <p>Dữ liệu đầu vào được làm sạch, tạo thêm đặc trưng mới, xử lý giá trị thiếu, chuẩn hoá về miền không âm, mã hoá biến phân loại, sau đó đưa vào mô hình Multinomial Naive Bayes để dự đoán xác suất tái nhập viện sớm.</p>
+        <p><b>Pipeline:</b> Làm sạch dữ liệu → Feature Engineering → Impute → MinMaxScaler + OneHotEncoder → Naive Bayes → Calibration → Dự đoán xác suất → Phân lớp theo threshold</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -629,16 +678,19 @@ elif page == "Triển khai mô hình":
 
         for col in available_input_cols:
             if col in numeric_cols:
-                col_series = pd.to_numeric(X_train[col], errors="coerce")
-                min_val = float(np.nanmin(col_series)) if not np.isnan(col_series).all() else 0.0
-                max_val = float(np.nanmax(col_series)) if not np.isnan(col_series).all() else 100.0
-                default_val = float(default_values.get(col, 0.0))
+                min_val = float(input_limits[col]["min"])
+                max_val = float(input_limits[col]["max"])
+                default_val = float(input_limits[col]["default"])
+
+                if min_val == max_val:
+                    max_val = min_val + 1.0
 
                 input_data[col] = st.number_input(
                     label=col,
                     min_value=min_val,
                     max_value=max_val,
-                    value=default_val
+                    value=default_val,
+                    step=1.0 if max_val > 5 else 0.1
                 )
 
             elif col in categorical_cols:
@@ -664,7 +716,8 @@ elif page == "Triển khai mô hình":
                 <li>Làm sạch dữ liệu, thay thế giá trị thiếu.</li>
                 <li>Tạo thêm các đặc trưng như total_visits, severity, care_intensity...</li>
                 <li>Mã hóa biến phân loại bằng OneHotEncoder.</li>
-                <li>Áp dụng Gaussian Naive Bayes để dự đoán xác suất.</li>
+                <li>Chuẩn hoá đặc trưng số bằng MinMaxScaler để phù hợp với Multinomial Naive Bayes.</li>
+                <li>Hiệu chỉnh xác suất bằng Calibration để kết quả bớt cực đoan.</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
@@ -672,7 +725,7 @@ elif page == "Triển khai mô hình":
         st.markdown(f"""
         <div class="card">
             <h3>4. Cấu hình mô hình</h3>
-            <p><b>Thuật toán:</b> Gaussian Naive Bayes</p>
+            <p><b>Thuật toán:</b> Multinomial Naive Bayes + Calibration</p>
             <p><b>Ngưỡng dự đoán:</b> {threshold:.2f}</p>
             <p><b>Đầu ra:</b> Xác suất + nhãn phân loại</p>
         </div>
@@ -690,6 +743,7 @@ elif page == "Triển khai mô hình":
     if st.button("Dự đoán nguy cơ tái nhập viện sớm"):
         input_df = pd.DataFrame([input_data])
         input_df = add_feature_engineering(input_df)
+        input_df = clip_input_by_train_range(input_df, X_train, numeric_cols)
 
         X_input = preprocessor.transform(input_df)
         if hasattr(X_input, "toarray"):
@@ -702,7 +756,7 @@ elif page == "Triển khai mô hình":
         if note:
             st.info(f"Ghi chú bệnh nhân: {note}")
 
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns([1.4, 0.6])
 
         with c1:
             if pred_label == "YES":
@@ -720,6 +774,10 @@ elif page == "Triển khai mô hình":
             st.write("Mẫu này được xếp vào nhóm nguy cơ vì xác suất dự đoán lớn hơn hoặc bằng ngưỡng đã chọn.")
         else:
             st.write("Mẫu này chưa bị xếp vào nhóm nguy cơ vì xác suất dự đoán thấp hơn ngưỡng đã chọn.")
+
+        st.markdown("### Một số giá trị đầu vào sau khi kiểm soát biên")
+        show_cols = [c for c in available_input_cols if c in input_df.columns]
+        st.dataframe(input_df[show_cols], use_container_width=True)
 
 
 # =========================================================
@@ -845,12 +903,12 @@ elif page == "Đánh giá hiệu năng":
 
         wrong_sample = X_test.iloc[first_mis].copy()
         true_label = "Nguy cơ" if y_test[first_mis] == 1 else "Không nguy cơ"
-        pred_label = "Nguy cơ" if y_pred[first_mis] == 1 else "Không nguy cơ"
+        pred_label_text = "Nguy cơ" if y_pred[first_mis] == 1 else "Không nguy cơ"
         pred_prob = y_prob[first_mis]
 
         summary_df = pd.DataFrame({
             "Nhãn thật": [true_label],
-            "Nhãn dự đoán": [pred_label],
+            "Nhãn dự đoán": [pred_label_text],
             "Xác suất dự đoán nguy cơ": [f"{pred_prob:.2%}"]
         })
         st.dataframe(summary_df, use_container_width=True)
@@ -867,7 +925,7 @@ elif page == "Đánh giá hiệu năng":
         st.markdown(f"""
         <div class="card">
             <h4>Nhận định</h4>
-            <p>Trường hợp này mô hình dự đoán sai vì nhãn thật là <b>{true_label}</b> nhưng mô hình lại dự đoán thành <b>{pred_label}</b>.
+            <p>Trường hợp này mô hình dự đoán sai vì nhãn thật là <b>{true_label}</b> nhưng mô hình lại dự đoán thành <b>{pred_label_text}</b>.
             Điều này cho thấy một số hồ sơ bệnh nhân có đặc trưng gần nhau giữa hai lớp, nên mô hình Naive Bayes vẫn có thể nhầm lẫn khi phân loại.</p>
         </div>
         """, unsafe_allow_html=True)
@@ -885,28 +943,26 @@ elif page == "So sánh & cải tiến":
     st.markdown("""
     <div class="card">
         <h3>1. Mô hình đang sử dụng</h3>
-        <p><b>Gaussian Naive Bayes</b> là mô hình đơn giản, dễ triển khai, tốc độ huấn luyện nhanh và phù hợp để làm mô hình cơ sở cho bài toán phân loại nhị phân.</p>
+        <p><b>Multinomial Naive Bayes</b> là một biến thể của Naive Bayes phù hợp hơn khi đặc trưng đầu vào ở dạng không âm sau khi mã hoá và chuẩn hoá. Kết hợp thêm bước <b>Calibration</b> giúp xác suất đầu ra bớt cực đoan hơn.</p>
     </div>
     """, unsafe_allow_html=True)
 
     compare_df = pd.DataFrame({
-        "Mô hình": ["Gaussian Naive Bayes", "Random Forest", "XGBoost", "LightGBM"],
+        "Mô hình": ["Gaussian Naive Bayes", "Multinomial Naive Bayes", "Bernoulli Naive Bayes"],
         "Ưu điểm": [
-            "Đơn giản, rất nhanh, dễ triển khai",
-            "Tốt với dữ liệu bảng, giảm overfitting tốt",
-            "Hiệu năng mạnh, thường cho kết quả cao",
-            "Nhanh, mạnh, phù hợp dữ liệu lớn"
+            "Đơn giản, nhanh với dữ liệu số liên tục",
+            "Phù hợp với đặc trưng không âm sau tiền xử lý",
+            "Phù hợp với dữ liệu nhị phân 0/1"
         ],
         "Hạn chế": [
-            "Giả định đặc trưng độc lập",
-            "Huấn luyện chậm hơn Naive Bayes",
-            "Phức tạp hơn, cần tinh chỉnh",
-            "Phức tạp hơn, cần tinh chỉnh"
+            "Không hợp khi dữ liệu có nhiều đặc trưng one-hot và phân phối không chuẩn",
+            "Vẫn có giả định độc lập giữa các đặc trưng",
+            "Kém phù hợp nếu có nhiều đặc trưng số liên tục"
         ],
-        "Mức phù hợp": ["Cơ sở", "Khá phù hợp", "Rất phù hợp", "Rất phù hợp"]
+        "Mức phù hợp với bài này": ["Thấp hơn", "Phù hợp hơn", "Khá phù hợp"]
     })
 
-    st.markdown("<div class='card'><h3>2. Bảng so sánh tổng quan</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'><h3>2. Bảng so sánh tổng quan trong họ Naive Bayes</h3></div>", unsafe_allow_html=True)
     st.dataframe(compare_df, use_container_width=True)
 
     st.markdown("""
@@ -914,9 +970,9 @@ elif page == "So sánh & cải tiến":
         <h3>3. Hạn chế của bài hiện tại</h3>
         <ul>
             <li>Mô hình Naive Bayes giả định các đặc trưng độc lập, trong khi dữ liệu y tế thường có mối liên hệ giữa các biến.</li>
-            <li>Chưa áp dụng các kỹ thuật xử lý mất cân bằng dữ liệu nâng cao.</li>
-            <li>Chưa so sánh thực nghiệm trực tiếp với các mô hình mạnh hơn trên cùng bộ dữ liệu.</li>
-            <li>Kết quả dự đoán vẫn phụ thuộc vào chất lượng dữ liệu gốc và mức độ đầy đủ của đặc trưng.</li>
+            <li>Xác suất dự đoán vẫn phụ thuộc khá nhiều vào chất lượng dữ liệu đầu vào.</li>
+            <li>Một số trường hợp cực trị vẫn có thể làm xác suất tăng hoặc giảm mạnh.</li>
+            <li>Chưa thực hiện chọn lọc đặc trưng chuyên sâu hơn.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -925,11 +981,11 @@ elif page == "So sánh & cải tiến":
     <div class="card">
         <h3>4. Hướng cải tiến</h3>
         <ul>
-            <li>Thử thêm Random Forest, XGBoost hoặc LightGBM để so sánh hiệu năng.</li>
+            <li>Tối ưu thêm bộ đặc trưng đầu vào.</li>
+            <li>Thử đánh giá thêm bằng cross-validation.</li>
             <li>Tối ưu threshold theo mục tiêu tăng Recall cho lớp nguy cơ.</li>
-            <li>Chọn lọc thêm đặc trưng quan trọng hoặc xây dựng đặc trưng mạnh hơn.</li>
-            <li>Xử lý mất cân bằng dữ liệu để cải thiện khả năng phát hiện nhóm nguy cơ.</li>
-            <li>Đánh giá bằng cross-validation để kết quả ổn định hơn.</li>
+            <li>Phân tích thêm các trường hợp dự đoán sai để tinh chỉnh dữ liệu.</li>
+            <li>Cân nhắc BernoulliNB nếu muốn nhấn mạnh nhóm đặc trưng nhị phân.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -937,6 +993,6 @@ elif page == "So sánh & cải tiến":
     st.markdown("""
     <div class="card">
         <h3>5. Kết luận</h3>
-        <p>Bài toán này là một bài toán <b>phân loại nhị phân</b> với mục tiêu phát hiện bệnh nhân có nguy cơ tái nhập viện sớm. Gaussian Naive Bayes phù hợp để xây dựng mô hình cơ sở nhờ tính đơn giản và tốc độ nhanh. Tuy nhiên, để ứng dụng tốt hơn trong thực tế, cần tiếp tục cải thiện đặc trưng, dữ liệu và thử nghiệm thêm các mô hình mạnh hơn.</p>
+        <p>Bài toán này là bài toán <b>phân loại nhị phân</b> với mục tiêu phát hiện bệnh nhân có nguy cơ tái nhập viện sớm. Thay vì dùng Gaussian Naive Bayes dễ cho xác suất cực đoan, phiên bản hiện tại sử dụng <b>Multinomial Naive Bayes kết hợp Calibration</b> để kết quả dự đoán hợp lý và ổn định hơn, nhưng vẫn giữ đúng định hướng Naive Bayes của đề tài.</p>
     </div>
     """, unsafe_allow_html=True)
