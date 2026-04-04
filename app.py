@@ -23,8 +23,12 @@ from sklearn.metrics import (
 )
 from sklearn.naive_bayes import GaussianNB
 
+
+# =========================================================
+# CẤU HÌNH TRANG
+# =========================================================
 st.set_page_config(
-    page_title="Phân loại nguy cơ tái nhập viện",
+    page_title="Phân loại nguy cơ tái nhập viện sớm",
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -37,8 +41,8 @@ html, body, [class*="css"] {
 }
 
 .block-container {
-    max-width: 1320px;
-    padding-top: 1.2rem;
+    max-width: 1380px;
+    padding-top: 1rem;
     padding-bottom: 2rem;
     padding-left: 2rem;
     padding-right: 2rem;
@@ -56,30 +60,30 @@ html, body, [class*="css"] {
 .hero-box {
     background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #1d4ed8 100%);
     border-radius: 24px;
-    padding: 30px 32px;
-    box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+    padding: 28px 32px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.22);
     border: 1px solid rgba(255,255,255,0.08);
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
 .hero-title {
-    font-size: 44px;
+    font-size: 36px;
     font-weight: 800;
-    line-height: 1.15;
+    line-height: 1.2;
     color: white;
     margin-bottom: 8px;
 }
 
 .hero-subtitle {
-    font-size: 16px;
+    font-size: 15px;
     color: #dbeafe;
     line-height: 1.6;
 }
 
 .section-title {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 800;
-    margin: 8px 0 16px 0;
+    margin: 10px 0 16px 0;
 }
 
 .card {
@@ -88,26 +92,26 @@ html, body, [class*="css"] {
     border-radius: 18px;
     padding: 18px 20px;
     margin-bottom: 16px;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.10);
 }
 
 .metric-card {
-    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 18px;
-    padding: 18px 14px;
+    padding: 16px 14px;
     text-align: center;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.10);
 }
 
 .metric-label {
-    font-size: 15px;
+    font-size: 14px;
     color: #cbd5e1;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .metric-value {
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 800;
     color: white;
 }
@@ -129,13 +133,6 @@ html, body, [class*="css"] {
     margin-bottom: 8px;
 }
 
-hr {
-    border: none;
-    height: 1px;
-    background: rgba(255,255,255,0.08);
-    margin: 14px 0;
-}
-
 div.stButton > button {
     width: 100%;
     border-radius: 14px;
@@ -153,48 +150,99 @@ div.stButton > button:hover {
     color: white;
 }
 
+[data-testid="stDataFrame"] {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
 div[data-testid="stMetric"] {
     background: transparent;
     border: none;
     box-shadow: none;
-}
-
-[data-testid="stDataFrame"] {
-    border-radius: 14px;
-    overflow: hidden;
 }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown("""
 <div class="hero-box">
-    <div class="hero-title">Phân loại nguy cơ tái nhập viện của bệnh nhân đái tháo đường bằng Naive Bayes</div>
+    <div class="hero-title">Phân loại nguy cơ tái nhập viện sớm của bệnh nhân đái tháo đường bằng Naive Bayes</div>
     <div class="hero-subtitle">
-        Ứng dụng hỗ trợ khám phá dữ liệu, dự đoán nguy cơ tái nhập viện và đánh giá hiệu năng mô hình
-        trên hồ sơ bệnh nhân bằng Streamlit.
+        Ứng dụng hỗ trợ khám phá dữ liệu, dự đoán nguy cơ tái nhập viện sớm và đánh giá hiệu năng mô hình
+        trên hồ sơ bệnh án bằng Streamlit.
     </div>
 </div>
 """, unsafe_allow_html=True)
 
+
+# =========================================================
+# HẰNG SỐ
+# =========================================================
+DATA_PATH = "hospital_readmissions.csv"
 MODEL_DIR = "models"
-MODEL_PATH = os.path.join(MODEL_DIR, "naive_bayes_model.pkl")
+MODEL_PATH = os.path.join(MODEL_DIR, "gaussian_nb_model.pkl")
 PREPROCESSOR_PATH = os.path.join(MODEL_DIR, "preprocessor.pkl")
 LABEL_ENCODER_PATH = os.path.join(MODEL_DIR, "label_encoder.pkl")
 
 
-@st.cache_data
-def load_data():
-    df = pd.read_csv("hospital_readmissions.csv")
-    df["readmitted"] = df["readmitted"].replace({
-        "<30": "YES",
-        ">30": "YES",
-        "NO": "NO"
-    })
-    return df
+# =========================================================
+# HÀM PHỤ
+# =========================================================
+def add_bar_labels(ax, fmt="{:.0f}"):
+    for p in ax.patches:
+        height = p.get_height()
+        ax.annotate(
+            fmt.format(height),
+            (p.get_x() + p.get_width() / 2, height),
+            ha="center",
+            va="bottom",
+            fontsize=10
+        )
+
+
+def safe_mode(series: pd.Series):
+    mode_values = series.mode(dropna=True)
+    if len(mode_values) > 0:
+        return mode_values.iloc[0]
+    return None
+
+
+def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
+    data = df.copy()
+
+    data = data.replace("?", np.nan)
+    data = data.replace("None", np.nan)
+    data = data.replace("", np.nan)
+
+    if "readmitted" in data.columns:
+        data["readmitted"] = data["readmitted"].astype(str).str.strip()
+        # Đúng bài toán tái nhập viện sớm:
+        # <30 = YES ; >30, NO = NO
+        data["readmitted"] = data["readmitted"].replace({
+            "<30": "YES",
+            ">30": "NO",
+            "NO": "NO"
+        })
+
+    return data
 
 
 def add_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     data = df.copy()
+
+    numeric_candidates = [
+        "time_in_hospital",
+        "n_lab_procedures",
+        "n_procedures",
+        "n_medications",
+        "n_outpatient",
+        "n_inpatient",
+        "n_emergency",
+        "number_diagnoses"
+    ]
+
+    for col in numeric_candidates:
+        if col in data.columns:
+            data[col] = pd.to_numeric(data[col], errors="coerce")
 
     if all(col in data.columns for col in ["n_outpatient", "n_inpatient", "n_emergency"]):
         data["total_visits"] = (
@@ -204,35 +252,65 @@ def add_feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
         )
 
     if all(col in data.columns for col in ["n_inpatient", "n_outpatient"]):
-        data["visit_ratio"] = data["n_inpatient"] / (data["n_outpatient"] + 1)
+        data["visit_ratio"] = data["n_inpatient"].fillna(0) / (data["n_outpatient"].fillna(0) + 1)
 
     if all(col in data.columns for col in ["time_in_hospital", "n_lab_procedures"]):
-        data["severity"] = data["time_in_hospital"] * data["n_lab_procedures"]
+        data["severity"] = data["time_in_hospital"].fillna(0) * data["n_lab_procedures"].fillna(0)
 
     if all(col in data.columns for col in ["n_medications", "n_procedures"]):
-        data["med_ratio"] = data["n_medications"] / (data["n_procedures"] + 1)
+        data["med_ratio"] = data["n_medications"].fillna(0) / (data["n_procedures"].fillna(0) + 1)
 
     if all(col in data.columns for col in ["n_medications", "time_in_hospital"]):
-        data["care_intensity"] = data["n_medications"] / (data["time_in_hospital"] + 1)
+        data["care_intensity"] = data["n_medications"].fillna(0) / (data["time_in_hospital"].fillna(0) + 1)
 
     if "age" in data.columns:
-        data["is_elderly"] = data["age"].astype(str).str.contains("70|80|90").astype(int)
+        age_str = data["age"].astype(str)
+        data["is_elderly"] = age_str.str.contains("70|80|90", regex=True, na=False).astype(int)
 
     if "time_in_hospital" in data.columns:
-        data["long_stay"] = (data["time_in_hospital"] > 7).astype(int)
+        data["long_stay"] = (data["time_in_hospital"].fillna(0) > 7).astype(int)
 
     if "n_medications" in data.columns:
-        data["high_med"] = (data["n_medications"] > 10).astype(int)
+        data["high_med"] = (data["n_medications"].fillna(0) > 10).astype(int)
 
     if all(col in data.columns for col in ["n_lab_procedures", "n_procedures"]):
-        data["total_procedures"] = data["n_lab_procedures"] + data["n_procedures"]
+        data["total_procedures"] = data["n_lab_procedures"].fillna(0) + data["n_procedures"].fillna(0)
 
     return data
 
 
+@st.cache_data
+def load_data():
+    if not os.path.exists(DATA_PATH):
+        st.error(f"Không tìm thấy file dữ liệu: {DATA_PATH}")
+        st.stop()
+
+    df = pd.read_csv(DATA_PATH)
+    df = clean_raw_data(df)
+    return df
+
+
+def build_default_values(X_train: pd.DataFrame, numeric_cols, categorical_cols):
+    defaults = {}
+
+    for col in numeric_cols:
+        defaults[col] = float(pd.to_numeric(X_train[col], errors="coerce").median())
+
+    for col in categorical_cols:
+        mode_val = safe_mode(X_train[col].astype(str))
+        defaults[col] = str(mode_val) if mode_val is not None else "Unknown"
+
+    return defaults
+
+
 @st.cache_resource(show_spinner=False)
-def prepare_and_train_model(df):
+def prepare_and_train_model(df: pd.DataFrame):
     data = add_feature_engineering(df)
+
+    if "readmitted" not in data.columns:
+        raise ValueError("Dữ liệu không có cột mục tiêu 'readmitted'.")
+
+    data = data.dropna(subset=["readmitted"]).copy()
 
     target_col = "readmitted"
     X = data.drop(columns=[target_col])
@@ -282,22 +360,14 @@ def prepare_and_train_model(df):
     joblib.dump(preprocessor, PREPROCESSOR_PATH)
     joblib.dump(label_encoder, LABEL_ENCODER_PATH)
 
-    return (
-        model,
-        preprocessor,
-        label_encoder,
-        X_train,
-        X_test,
-        y_train,
-        y_test,
-        categorical_cols,
-        numeric_cols
-    )
+    return model, preprocessor, label_encoder, X_train, X_test, y_train, y_test, categorical_cols, numeric_cols
 
 
 @st.cache_resource(show_spinner=False)
-def load_or_train_model(df):
+def load_or_train_model(df: pd.DataFrame):
     data = add_feature_engineering(df)
+    data = data.dropna(subset=["readmitted"]).copy()
+
     target_col = "readmitted"
     X = data.drop(columns=[target_col])
     y = data[target_col].astype(str)
@@ -310,35 +380,59 @@ def load_or_train_model(df):
         and os.path.exists(PREPROCESSOR_PATH)
         and os.path.exists(LABEL_ENCODER_PATH)
     ):
-        model = joblib.load(MODEL_PATH)
-        preprocessor = joblib.load(PREPROCESSOR_PATH)
-        label_encoder = joblib.load(LABEL_ENCODER_PATH)
+        try:
+            model = joblib.load(MODEL_PATH)
+            preprocessor = joblib.load(PREPROCESSOR_PATH)
+            label_encoder = joblib.load(LABEL_ENCODER_PATH)
 
-        y_encoded = label_encoder.transform(y)
+            y_encoded = label_encoder.transform(y)
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X,
-            y_encoded,
-            test_size=0.2,
-            random_state=42,
-            stratify=y_encoded
-        )
+            X_train, X_test, y_train, y_test = train_test_split(
+                X,
+                y_encoded,
+                test_size=0.2,
+                random_state=42,
+                stratify=y_encoded
+            )
 
-        return (
-            model,
-            preprocessor,
-            label_encoder,
-            X_train,
-            X_test,
-            y_train,
-            y_test,
-            categorical_cols,
-            numeric_cols
-        )
+            return model, preprocessor, label_encoder, X_train, X_test, y_train, y_test, categorical_cols, numeric_cols
+        except Exception:
+            return prepare_and_train_model(df)
 
     return prepare_and_train_model(df)
 
 
+def evaluate_model(model, preprocessor, X_test, y_test, threshold=0.5):
+    X_test_processed = preprocessor.transform(X_test)
+    if hasattr(X_test_processed, "toarray"):
+        X_test_processed = X_test_processed.toarray()
+
+    y_prob = model.predict_proba(X_test_processed)[:, 1]
+    y_pred = (y_prob >= threshold).astype(int)
+
+    result = {
+        "y_prob": y_prob,
+        "y_pred": y_pred,
+        "accuracy": accuracy_score(y_test, y_pred),
+        "precision_pos": precision_score(y_test, y_pred, pos_label=1, zero_division=0),
+        "recall_pos": recall_score(y_test, y_pred, pos_label=1, zero_division=0),
+        "f1_pos": f1_score(y_test, y_pred, pos_label=1, zero_division=0),
+        "precision_macro": precision_score(y_test, y_pred, average="macro", zero_division=0),
+        "recall_macro": recall_score(y_test, y_pred, average="macro", zero_division=0),
+        "f1_macro": f1_score(y_test, y_pred, average="macro", zero_division=0)
+    }
+
+    try:
+        result["auc"] = roc_auc_score(y_test, y_prob)
+    except Exception:
+        result["auc"] = 0.0
+
+    return result
+
+
+# =========================================================
+# LOAD DỮ LIỆU + MODEL
+# =========================================================
 df = load_data()
 
 (
@@ -353,21 +447,7 @@ df = load_data()
     numeric_cols
 ) = load_or_train_model(df)
 
-X_test_processed = preprocessor.transform(X_test)
-if hasattr(X_test_processed, "toarray"):
-    X_test_processed = X_test_processed.toarray()
-
-y_prob = model.predict_proba(X_test_processed)[:, 1]
-y_pred = (y_prob > 0.5).astype(int)
-auc = roc_auc_score(y_test, y_prob)
-
-metrics = {
-    "accuracy": accuracy_score(y_test, y_pred),
-    "precision": precision_score(y_test, y_pred, average="macro", zero_division=0),
-    "recall": recall_score(y_test, y_pred, average="macro", zero_division=0),
-    "f1": f1_score(y_test, y_pred, average="macro", zero_division=0),
-    "auc": auc
-}
+default_values = build_default_values(X_train, numeric_cols, categorical_cols)
 
 st.sidebar.markdown("## Điều hướng")
 st.sidebar.markdown("<div class='small-muted'>Chọn nội dung muốn xem</div>", unsafe_allow_html=True)
@@ -383,219 +463,322 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
+threshold = st.sidebar.slider(
+    "Ngưỡng dự đoán",
+    min_value=0.10,
+    max_value=0.90,
+    value=0.50,
+    step=0.05
+)
+
+st.sidebar.markdown("---")
 st.sidebar.markdown("### Thông tin mô hình")
 st.sidebar.markdown("**Thuật toán:** Gaussian Naive Bayes")
 st.sidebar.markdown("**Bài toán:** Phân loại nhị phân")
-st.sidebar.markdown("**Nguồn dữ liệu:** hospital_readmissions.csv")
+st.sidebar.markdown("**Mục tiêu:** Dự đoán tái nhập viện sớm ")
+st.sidebar.markdown(f"**Ngưỡng hiện tại:** {threshold:.2f}")
+st.sidebar.markdown(f"**Nguồn dữ liệu:** {DATA_PATH}")
 
+eval_result = evaluate_model(model, preprocessor, X_test, y_test, threshold=threshold)
+y_prob = eval_result["y_prob"]
+y_pred = eval_result["y_pred"]
+
+
+# =========================================================
+# TRANG 1 - GIỚI THIỆU & EDA
+# =========================================================
 if page == "Giới thiệu & EDA":
     st.markdown("<div class='section-title'>Trang 1: Giới thiệu & Khám phá dữ liệu (EDA)</div>", unsafe_allow_html=True)
 
     st.markdown("""
     <div class="card">
         <h3>1. Thông tin bài toán</h3>
-        <p><b>Tên đề tài:</b> Phân loại nguy cơ tái nhập viện của bệnh nhân đái tháo đường bằng Naive Bayes nhằm hỗ trợ dự đoán sớm và tối ưu theo dõi điều trị</p>
-        <p><b>Họ tên SV:</b> Nguyễn Trọng Quý<br><b>MSSV:</b> 22T1020719</p>
-        <p><b>Mô tả ngắn gọn giá trị thực tiễn:</b><br>
-        Mô hình hỗ trợ phân loại sớm bệnh nhân có nguy cơ tái nhập viện, từ đó giúp bác sĩ và bệnh viện theo dõi sát hơn, can thiệp kịp thời và tối ưu phân bổ nguồn lực.</p>
+        <p><b>Tên đề tài:</b> Phân loại nguy cơ tái nhập viện sớm của bệnh nhân đái tháo đường bằng Naive Bayes</p>
+        <p><b>Bản chất bài toán:</b> Phân loại nhị phân, trong đó <b>YES</b> là bệnh nhân tái nhập viện sớm , <b>NO</b> là còn lại.</p>
+        <p><b>Giá trị thực tiễn:</b> Mô hình hỗ trợ nhận diện sớm bệnh nhân có nguy cơ quay lại bệnh viện trong thời gian ngắn, giúp bác sĩ theo dõi sát hơn và hỗ trợ phân bổ nguồn lực điều trị hợp lý hơn.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div class='card'><h3>2. Xem dữ liệu</h3></div>", unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
+    st.markdown("<div class='card'><h3>2. Thông tin dữ liệu</h3></div>", unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown(f"<div class='info-chip'>Số dòng: {df.shape[0]}</div>", unsafe_allow_html=True)
     with c2:
         st.markdown(f"<div class='info-chip'>Số cột: {df.shape[1]}</div>", unsafe_allow_html=True)
-    st.dataframe(df.head(10), width="stretch")
+    with c3:
+        target_dist = df["readmitted"].value_counts(dropna=False).to_dict() if "readmitted" in df.columns else {}
+        st.markdown(f"<div class='info-chip'>Phân bố nhãn: {target_dist}</div>", unsafe_allow_html=True)
+
+    st.dataframe(df.head(10), use_container_width=True)
 
     st.markdown("<div class='card'><h3>3. Kiểm tra dữ liệu thiếu</h3></div>", unsafe_allow_html=True)
     missing_df = pd.DataFrame({
         "Tên cột": df.columns,
-        "Số giá trị thiếu": df.isnull().sum().values
-    })
-    st.dataframe(missing_df, width="stretch")
+        "Số giá trị thiếu": df.isnull().sum().values,
+        "Tỷ lệ thiếu (%)": (df.isnull().sum().values / len(df) * 100).round(2)
+    }).sort_values(by="Số giá trị thiếu", ascending=False)
+    st.dataframe(missing_df, use_container_width=True)
 
-    st.markdown("<div class='card'><h3>4. Các biểu đồ phân tích</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'><h3>4. Biểu đồ phân tích dữ liệu</h3></div>", unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
     with col1:
-        fig1, ax1 = plt.subplots()
-        df["readmitted"].value_counts().plot(kind="bar", ax=ax1)
-        ax1.set_title("Phân bố nhãn readmitted")
-        st.pyplot(fig1)
+        if "readmitted" in df.columns:
+            fig1, ax1 = plt.subplots(figsize=(8, 4.5))
+            counts = df["readmitted"].value_counts()
+            counts.plot(kind="bar", ax=ax1)
+            ax1.set_title("Phân bố nhãn readmitted", fontsize=14, fontweight="bold")
+            ax1.set_xlabel("Nhãn")
+            ax1.set_ylabel("Số lượng")
+            ax1.tick_params(axis="x", rotation=0)
+            add_bar_labels(ax1)
+            plt.tight_layout()
+            st.pyplot(fig1)
 
     with col2:
-        fig2, ax2 = plt.subplots()
-        df["age"].value_counts().sort_index().plot(kind="bar", ax=ax2)
-        ax2.set_title("Phân bố nhóm tuổi")
-        st.pyplot(fig2)
+        if "age" in df.columns:
+            fig2, ax2 = plt.subplots(figsize=(8, 4.5))
+            age_counts = df["age"].astype(str).value_counts().sort_index()
+            age_counts.plot(kind="bar", ax=ax2)
+            ax2.set_title("Phân bố nhóm tuổi", fontsize=14, fontweight="bold")
+            ax2.set_xlabel("Nhóm tuổi")
+            ax2.set_ylabel("Số lượng")
+            ax2.tick_params(axis="x", rotation=45)
+            plt.tight_layout()
+            st.pyplot(fig2)
 
-    fig3, ax3 = plt.subplots()
-    df.groupby("readmitted")["time_in_hospital"].mean().plot(kind="bar", ax=ax3)
-    ax3.set_title("Thời gian nằm viện trung bình theo nhãn")
-    st.pyplot(fig3)
+    if all(col in df.columns for col in ["readmitted", "time_in_hospital"]):
+        fig3, ax3 = plt.subplots(figsize=(10, 5))
+        avg_stay = df.groupby("readmitted")["time_in_hospital"].mean()
+        avg_stay.plot(kind="bar", ax=ax3)
+        ax3.set_title("Thời gian nằm viện trung bình theo nhãn", fontsize=16, fontweight="bold")
+        ax3.set_xlabel("Nhãn readmitted")
+        ax3.set_ylabel("Số ngày nằm viện trung bình")
+        ax3.tick_params(axis="x", rotation=0)
+        add_bar_labels(ax3, fmt="{:.2f}")
+        plt.tight_layout()
+        st.pyplot(fig3)
 
     st.markdown("""
     <div class="card">
         <h3>5. Nhận xét dữ liệu</h3>
         <ul>
-            <li>Dữ liệu có cột mục tiêu là <b>readmitted</b>.</li>
-            <li>Bộ dữ liệu gồm cả biến số và biến phân loại.</li>
-            <li>Đây là bài toán phân loại nhị phân sau khi gộp nhãn.</li>
-            <li>Một số đặc trưng như thời gian nằm viện, số lần nhập viện, số xét nghiệm và số thuốc có ảnh hưởng đến kết quả.</li>
+            <li>Dữ liệu gồm cả biến số và biến phân loại.</li>
+            <li>Cột mục tiêu là <b>readmitted</b>, đã được quy đổi thành bài toán nhị phân cho mục tiêu phát hiện tái nhập viện sớm.</li>
+            <li>Một số đặc trưng như thời gian nằm viện, số thuốc, số lần nhập viện và số xét nghiệm có thể liên quan đến nguy cơ tái nhập viện.</li>
+            <li>Dữ liệu có giá trị thiếu nên cần bước tiền xử lý trước khi huấn luyện mô hình.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class="card">
-        <h3>6. Giải thích dữ liệu</h3>
+        <h3>6. Giải thích bài toán</h3>
         <ul>
-            <li>Nhãn <b>readmitted</b> đã được gộp thành <b>YES</b> và <b>NO</b>.</li>
-            <li>Có thêm các đặc trưng mới bằng feature engineering để tăng thông tin cho mô hình.</li>
-            <li>Naive Bayes phù hợp làm mô hình cơ bản vì đơn giản, dễ triển khai và tốc độ huấn luyện nhanh.</li>
+            <li><b>YES</b>: bệnh nhân tái nhập viện sớm .</li>
+            <li><b>NO</b>: bệnh nhân không tái nhập viện sớm.</li>
+            <li>Mục tiêu của mô hình là phát hiện sớm nhóm nguy cơ để ưu tiên theo dõi.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
+
+# =========================================================
+# TRANG 2 - TRIỂN KHAI MÔ HÌNH
+# =========================================================
 elif page == "Triển khai mô hình":
     st.markdown("<div class='section-title'>Trang 2: Triển khai mô hình</div>", unsafe_allow_html=True)
 
-    left, right = st.columns([1.2, 0.8])
+    st.markdown("""
+    <div class="card">
+        <h3>1. Mô tả quy trình xử lý</h3>
+        <p>Dữ liệu đầu vào được làm sạch, tạo thêm đặc trưng mới, xử lý giá trị thiếu, mã hóa biến phân loại, sau đó đưa vào mô hình Gaussian Naive Bayes để dự đoán xác suất tái nhập viện sớm.</p>
+        <p><b>Pipeline:</b> Làm sạch dữ liệu → Feature Engineering → Tiền xử lý → Train/Test Split → GaussianNB → Dự đoán xác suất → Phân lớp theo threshold</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    left, right = st.columns([1.25, 0.75])
+
+    selected_input_cols = [
+        "age",
+        "time_in_hospital",
+        "n_lab_procedures",
+        "n_procedures",
+        "n_medications",
+        "n_outpatient",
+        "n_inpatient",
+        "n_emergency",
+        "number_diagnoses",
+        "gender",
+        "A1Cresult",
+        "max_glu_serum",
+        "insulin",
+        "change",
+        "diabetesMed"
+    ]
+
+    available_input_cols = [col for col in selected_input_cols if col in X_train.columns]
 
     with left:
-        st.markdown("<div class='card'><h3>1. Nhập dữ liệu bệnh nhân</h3></div>", unsafe_allow_html=True)
+        st.markdown("<div class='card'><h3>2. Nhập dữ liệu bệnh nhân</h3></div>", unsafe_allow_html=True)
+
         note = st.text_input("Ghi chú bệnh nhân (tuỳ chọn)")
         input_data = {}
 
-        for col in numeric_cols:
-            min_val = float(X_train[col].min())
-            max_val = float(X_train[col].max())
-            mean_val = float(X_train[col].mean())
+        for col in available_input_cols:
+            if col in numeric_cols:
+                col_series = pd.to_numeric(X_train[col], errors="coerce")
+                min_val = float(np.nanmin(col_series)) if not np.isnan(col_series).all() else 0.0
+                max_val = float(np.nanmax(col_series)) if not np.isnan(col_series).all() else 100.0
+                default_val = float(default_values.get(col, 0.0))
 
-            input_data[col] = st.number_input(
-                label=col,
-                min_value=min_val,
-                max_value=max_val,
-                value=mean_val
-            )
+                input_data[col] = st.number_input(
+                    label=col,
+                    min_value=min_val,
+                    max_value=max_val,
+                    value=default_val
+                )
 
-        for col in categorical_cols:
-            options = sorted(X_train[col].astype(str).unique().tolist())
-            input_data[col] = st.selectbox(col, options)
+            elif col in categorical_cols:
+                options = sorted(X_train[col].astype(str).dropna().unique().tolist())
+                default_val = str(default_values.get(col, options[0] if options else "Unknown"))
+                default_index = options.index(default_val) if default_val in options else 0
+
+                input_data[col] = st.selectbox(
+                    col,
+                    options=options,
+                    index=default_index if len(options) > 0 else 0
+                )
+
+        for col in X_train.columns:
+            if col not in input_data:
+                input_data[col] = default_values.get(col, 0 if col in numeric_cols else "Unknown")
 
     with right:
         st.markdown("""
         <div class="card">
-            <h3>2. Xử lý logic</h3>
-            <p>- Dữ liệu được xử lý bằng <b>SimpleImputer</b> và <b>OneHotEncoder</b>.</p>
-            <p>- Có áp dụng <b>feature engineering</b> để tạo thêm các đặc trưng hỗ trợ dự đoán.</p>
-            <p>- Mô hình sử dụng <b>Gaussian Naive Bayes</b>.</p>
-            <p>- Sau khi mã hóa, dữ liệu được chuyển sang dạng số để phù hợp với GaussianNB.</p>
+            <h3>3. Xử lý kỹ thuật</h3>
+            <ul>
+                <li>Làm sạch dữ liệu, thay thế giá trị thiếu.</li>
+                <li>Tạo thêm các đặc trưng như total_visits, severity, care_intensity...</li>
+                <li>Mã hóa biến phân loại bằng OneHotEncoder.</li>
+                <li>Áp dụng Gaussian Naive Bayes để dự đoán xác suất.</li>
+            </ul>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("""
-        <div class="card">
-            <h3>3. Pipeline</h3>
-            <p>Dữ liệu → Gộp label → Feature Engineering → Tiền xử lý → Train/Test → Naive Bayes → Dự đoán</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("""
+        st.markdown(f"""
         <div class="card">
             <h3>4. Cấu hình mô hình</h3>
-            <p><b>Thuật toán:</b> GaussianNB</p>
-            <p><b>Ngưỡng dự đoán:</b> 0.5</p>
+            <p><b>Thuật toán:</b> Gaussian Naive Bayes</p>
+            <p><b>Ngưỡng dự đoán:</b> {threshold:.2f}</p>
+            <p><b>Đầu ra:</b> Xác suất + nhãn phân loại</p>
         </div>
         """, unsafe_allow_html=True)
 
-    input_df = pd.DataFrame([input_data]) if len(input_data) > 0 else None
+        st.markdown("""
+        <div class="card">
+            <h3>5. Ý nghĩa đầu ra</h3>
+            <p>Nếu xác suất dự đoán lớn hơn hoặc bằng ngưỡng đang chọn, bệnh nhân sẽ được xếp vào nhóm <b>nguy cơ tái nhập viện sớm</b>.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("<div class='card'><h3>5. Hiển thị kết quả</h3></div>", unsafe_allow_html=True)
+    st.markdown("<div class='card'><h3>6. Kết quả dự đoán</h3></div>", unsafe_allow_html=True)
 
-    if st.button("Dự đoán nguy cơ tái nhập viện"):
+    if st.button("Dự đoán nguy cơ tái nhập viện sớm"):
+        input_df = pd.DataFrame([input_data])
         input_df = add_feature_engineering(input_df)
+
         X_input = preprocessor.transform(input_df)
         if hasattr(X_input, "toarray"):
             X_input = X_input.toarray()
 
         prob = model.predict_proba(X_input)[0][1]
-        pred = 1 if prob > 0.5 else 0
-        label = label_encoder.inverse_transform([pred])[0]
+        pred = 1 if prob >= threshold else 0
+        pred_label = "YES" if pred == 1 else "NO"
 
         if note:
             st.info(f"Ghi chú bệnh nhân: {note}")
 
-        r1, r2 = st.columns([1, 1])
+        c1, c2 = st.columns(2)
 
-        with r1:
-            if str(label).lower() == "yes":
-                st.error("Kết quả: Bệnh nhân có nguy cơ tái nhập viện")
+        with c1:
+            if pred_label == "YES":
+                st.error("Kết quả: Bệnh nhân có nguy cơ tái nhập viện sớm")
             else:
-                st.success("Kết quả: Bệnh nhân không có nguy cơ tái nhập viện")
+                st.success("Kết quả: Bệnh nhân không có nguy cơ tái nhập viện sớm")
 
-        with r2:
+        with c2:
             st.metric("Xác suất nguy cơ", f"{prob:.2%}")
 
         st.progress(float(prob))
 
+        st.markdown("### Giải thích ngắn")
+        if pred == 1:
+            st.write("Mẫu này được xếp vào nhóm nguy cơ vì xác suất dự đoán lớn hơn hoặc bằng ngưỡng đã chọn.")
+        else:
+            st.write("Mẫu này chưa bị xếp vào nhóm nguy cơ vì xác suất dự đoán thấp hơn ngưỡng đã chọn.")
+
+
+# =========================================================
+# TRANG 3 - ĐÁNH GIÁ HIỆU NĂNG
+# =========================================================
 elif page == "Đánh giá hiệu năng":
     st.markdown("<div class='section-title'>Trang 3: Đánh giá hiệu năng</div>", unsafe_allow_html=True)
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    m1, m2, m3, m4, m5 = st.columns(5)
 
-    with c1:
+    with m1:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">Accuracy</div>
-            <div class="metric-value">{metrics['accuracy']:.4f}</div>
+            <div class="metric-value">{eval_result['accuracy']:.4f}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    with c2:
+    with m2:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Precision</div>
-            <div class="metric-value">{metrics['precision']:.4f}</div>
+            <div class="metric-label">Precision (Nguy cơ)</div>
+            <div class="metric-value">{eval_result['precision_pos']:.4f}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    with c3:
+    with m3:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">Recall</div>
-            <div class="metric-value">{metrics['recall']:.4f}</div>
+            <div class="metric-label">Recall (Nguy cơ)</div>
+            <div class="metric-value">{eval_result['recall_pos']:.4f}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    with c4:
+    with m4:
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-label">F1-score</div>
-            <div class="metric-value">{metrics['f1']:.4f}</div>
+            <div class="metric-label">F1-score (Nguy cơ)</div>
+            <div class="metric-value">{eval_result['f1_pos']:.4f}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    with c5:
+    with m5:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-label">AUC-ROC</div>
-            <div class="metric-value">{metrics['auc']:.4f}</div>
+            <div class="metric-value">{eval_result['auc']:.4f}</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class="card">
-        <h3>0. Giải thích chỉ số</h3>
+        <h3>0. Giải thích các chỉ số</h3>
         <ul>
-            <li><b>Accuracy:</b> tỷ lệ dự đoán đúng.</li>
-            <li><b>Precision:</b> độ chính xác khi dự đoán lớp nguy cơ.</li>
-            <li><b>Recall:</b> khả năng phát hiện đúng bệnh nhân nguy cơ.</li>
-            <li><b>F1-score:</b> cân bằng giữa Precision và Recall.</li>
-            <li><b>AUC-ROC:</b> khả năng phân biệt giữa hai lớp.</li>
+            <li><b>Accuracy:</b> Tỷ lệ dự đoán đúng trên toàn bộ tập kiểm tra.</li>
+            <li><b>Precision:</b> Trong các bệnh nhân bị dự đoán là nguy cơ, có bao nhiêu người đúng.</li>
+            <li><b>Recall:</b> Trong các bệnh nhân thực sự nguy cơ, mô hình phát hiện được bao nhiêu người.</li>
+            <li><b>F1-score:</b> Chỉ số cân bằng giữa Precision và Recall.</li>
+            <li><b>AUC-ROC:</b> Khả năng phân biệt hai lớp dựa trên xác suất dự đoán.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -604,73 +787,136 @@ elif page == "Đánh giá hiệu năng":
 
     with col_left:
         st.markdown("<div class='card'><h3>1. Confusion Matrix</h3></div>", unsafe_allow_html=True)
-        fig_cm, ax_cm = plt.subplots()
-        disp = ConfusionMatrixDisplay(confusion_matrix(y_test, y_pred))
-        disp.plot(ax=ax_cm)
+        fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
+        cm = confusion_matrix(y_test, y_pred)
+        disp = ConfusionMatrixDisplay(
+            confusion_matrix=cm,
+            display_labels=["Không nguy cơ", "Nguy cơ"]
+        )
+        disp.plot(ax=ax_cm, cmap="Blues", colorbar=False)
+        ax_cm.set_title("Ma trận nhầm lẫn", fontsize=14, fontweight="bold")
+        plt.tight_layout()
         st.pyplot(fig_cm)
 
     with col_right:
         st.markdown("<div class='card'><h3>2. ROC Curve</h3></div>", unsafe_allow_html=True)
+        fig_roc, ax_roc = plt.subplots(figsize=(6, 5))
         fpr, tpr, _ = roc_curve(y_test, y_prob)
-        fig_roc, ax_roc = plt.subplots()
-        ax_roc.plot(fpr, tpr, label=f"AUC = {metrics['auc']:.4f}")
+        ax_roc.plot(fpr, tpr, label=f"AUC = {eval_result['auc']:.4f}")
         ax_roc.plot([0, 1], [0, 1], linestyle="--")
+        ax_roc.set_title("Đường cong ROC", fontsize=14, fontweight="bold")
+        ax_roc.set_xlabel("False Positive Rate")
+        ax_roc.set_ylabel("True Positive Rate")
         ax_roc.legend()
+        plt.tight_layout()
         st.pyplot(fig_roc)
 
     st.markdown("<div class='card'><h3>3. Báo cáo phân loại</h3></div>", unsafe_allow_html=True)
-    report_df = pd.DataFrame(classification_report(y_test, y_pred, output_dict=True, zero_division=0)).transpose()
-    st.dataframe(report_df, width="stretch")
+    report_dict = classification_report(
+        y_test,
+        y_pred,
+        target_names=["Không nguy cơ", "Nguy cơ"],
+        output_dict=True,
+        zero_division=0
+    )
+    report_df = pd.DataFrame(report_dict).transpose()
+    st.dataframe(report_df, use_container_width=True)
 
-    st.markdown("""
+    tn, fp, fn, tp = cm.ravel()
+    st.markdown(f"""
     <div class="card">
-        <h3>4. Phân tích sai số</h3>
+        <h3>4. Phân tích sai số tổng quát</h3>
         <ul>
-            <li>Naive Bayes có ưu điểm là đơn giản và tốc độ nhanh.</li>
-            <li>Tuy nhiên mô hình giả định các đặc trưng độc lập với nhau, nên với dữ liệu y tế thực tế độ chính xác có thể không quá cao.</li>
-            <li>Việc gộp label và feature engineering giúp mô hình ổn định hơn so với dùng dữ liệu gốc.</li>
+            <li><b>TN = {tn}</b>: dự đoán đúng bệnh nhân không nguy cơ.</li>
+            <li><b>FP = {fp}</b>: dự đoán nhầm bệnh nhân không nguy cơ thành nguy cơ.</li>
+            <li><b>FN = {fn}</b>: bỏ sót bệnh nhân nguy cơ thực sự.</li>
+            <li><b>TP = {tp}</b>: phát hiện đúng bệnh nhân nguy cơ.</li>
         </ul>
+        <p>Trong bài toán y tế, chỉ số <b>Recall</b> và số <b>FN</b> rất quan trọng vì bỏ sót bệnh nhân nguy cơ có thể ảnh hưởng đến việc theo dõi và can thiệp sớm.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="card">
-        <h3>5. Nhận xét</h3>
-        <p>Naive Bayes là lựa chọn phù hợp làm mô hình cơ sở cho bài toán này. Ứng dụng đáp ứng được yêu cầu phân loại nguy cơ tái nhập viện và dễ triển khai.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("<div class='card'><h3>5. Chi tiết một trường hợp dự đoán sai</h3></div>", unsafe_allow_html=True)
 
+    mis_idx = np.where(y_test != y_pred)[0]
+
+    if len(mis_idx) > 0:
+        first_mis = mis_idx[0]
+
+        wrong_sample = X_test.iloc[first_mis].copy()
+        true_label = "Nguy cơ" if y_test[first_mis] == 1 else "Không nguy cơ"
+        pred_label = "Nguy cơ" if y_pred[first_mis] == 1 else "Không nguy cơ"
+        pred_prob = y_prob[first_mis]
+
+        summary_df = pd.DataFrame({
+            "Nhãn thật": [true_label],
+            "Nhãn dự đoán": [pred_label],
+            "Xác suất dự đoán nguy cơ": [f"{pred_prob:.2%}"]
+        })
+        st.dataframe(summary_df, use_container_width=True)
+
+        st.markdown("""
+        <div class="card">
+            <h4>Dữ liệu gốc của mẫu bị dự đoán sai</h4>
+        </div>
+        """, unsafe_allow_html=True)
+
+        detail_df = pd.DataFrame(wrong_sample).T
+        st.dataframe(detail_df, use_container_width=True)
+
+        st.markdown(f"""
+        <div class="card">
+            <h4>Nhận định</h4>
+            <p>Trường hợp này mô hình dự đoán sai vì nhãn thật là <b>{true_label}</b> nhưng mô hình lại dự đoán thành <b>{pred_label}</b>.
+            Điều này cho thấy một số hồ sơ bệnh nhân có đặc trưng gần nhau giữa hai lớp, nên mô hình Naive Bayes vẫn có thể nhầm lẫn khi phân loại.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    else:
+        st.success("Không có mẫu dự đoán sai trên tập kiểm tra ở ngưỡng hiện tại.")
+
+
+# =========================================================
+# TRANG 4 - SO SÁNH & CẢI TIẾN
+# =========================================================
 elif page == "So sánh & cải tiến":
     st.markdown("<div class='section-title'>Trang 4: So sánh & cải tiến</div>", unsafe_allow_html=True)
 
     st.markdown("""
     <div class="card">
-        <h3>1. So sánh các mô hình</h3>
-        <ul>
-            <li><b>Naive Bayes:</b> đơn giản, nhanh nhưng độ chính xác thường thấp hơn.</li>
-            <li><b>Random Forest:</b> khá tốt với dữ liệu bảng.</li>
-            <li><b>XGBoost:</b> mạnh với boosting và ổn định.</li>
-            <li><b>LightGBM:</b> nhanh, mạnh và phù hợp với dữ liệu bảng lớn.</li>
-        </ul>
+        <h3>1. Mô hình đang sử dụng</h3>
+        <p><b>Gaussian Naive Bayes</b> là mô hình đơn giản, dễ triển khai, tốc độ huấn luyện nhanh và phù hợp để làm mô hình cơ sở cho bài toán phân loại nhị phân.</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div class='card'><h3>2. Bảng so sánh tổng quan</h3></div>", unsafe_allow_html=True)
     compare_df = pd.DataFrame({
-        "Mô hình": ["Naive Bayes", "Random Forest", "XGBoost", "LightGBM"],
-        "Độ chính xác": ["Trung bình", "Khá", "Cao", "Cao"],
-        "Tốc độ": ["Rất nhanh", "Trung bình", "Trung bình", "Nhanh"],
-        "Độ phức tạp": ["Thấp", "Trung bình", "Cao", "Cao"]
+        "Mô hình": ["Gaussian Naive Bayes", "Random Forest", "XGBoost", "LightGBM"],
+        "Ưu điểm": [
+            "Đơn giản, rất nhanh, dễ triển khai",
+            "Tốt với dữ liệu bảng, giảm overfitting tốt",
+            "Hiệu năng mạnh, thường cho kết quả cao",
+            "Nhanh, mạnh, phù hợp dữ liệu lớn"
+        ],
+        "Hạn chế": [
+            "Giả định đặc trưng độc lập",
+            "Huấn luyện chậm hơn Naive Bayes",
+            "Phức tạp hơn, cần tinh chỉnh",
+            "Phức tạp hơn, cần tinh chỉnh"
+        ],
+        "Mức phù hợp": ["Cơ sở", "Khá phù hợp", "Rất phù hợp", "Rất phù hợp"]
     })
-    st.dataframe(compare_df, width="stretch")
+
+    st.markdown("<div class='card'><h3>2. Bảng so sánh tổng quan</h3></div>", unsafe_allow_html=True)
+    st.dataframe(compare_df, use_container_width=True)
 
     st.markdown("""
     <div class="card">
-        <h3>3. Hạn chế</h3>
+        <h3>3. Hạn chế của bài hiện tại</h3>
         <ul>
-            <li>Dữ liệu y tế có nhiều nhiễu.</li>
-            <li>Feature hiện có chưa phản ánh đầy đủ mức độ bệnh.</li>
-            <li>Naive Bayes giả định độc lập đặc trưng, trong khi dữ liệu thực tế thường có mối liên hệ giữa các biến.</li>
+            <li>Mô hình Naive Bayes giả định các đặc trưng độc lập, trong khi dữ liệu y tế thường có mối liên hệ giữa các biến.</li>
+            <li>Chưa áp dụng các kỹ thuật xử lý mất cân bằng dữ liệu nâng cao.</li>
+            <li>Chưa so sánh thực nghiệm trực tiếp với các mô hình mạnh hơn trên cùng bộ dữ liệu.</li>
+            <li>Kết quả dự đoán vẫn phụ thuộc vào chất lượng dữ liệu gốc và mức độ đầy đủ của đặc trưng.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -679,21 +925,18 @@ elif page == "So sánh & cải tiến":
     <div class="card">
         <h3>4. Hướng cải tiến</h3>
         <ul>
-            <li>Thử các mô hình mạnh hơn như Random Forest, XGBoost hoặc LightGBM.</li>
-            <li>Bổ sung thêm dữ liệu thật từ nguồn khác.</li>
-            <li>Tạo thêm đặc trưng mạnh hơn.</li>
-            <li>Tối ưu ngưỡng dự đoán và cách chọn đặc trưng.</li>
+            <li>Thử thêm Random Forest, XGBoost hoặc LightGBM để so sánh hiệu năng.</li>
+            <li>Tối ưu threshold theo mục tiêu tăng Recall cho lớp nguy cơ.</li>
+            <li>Chọn lọc thêm đặc trưng quan trọng hoặc xây dựng đặc trưng mạnh hơn.</li>
+            <li>Xử lý mất cân bằng dữ liệu để cải thiện khả năng phát hiện nhóm nguy cơ.</li>
+            <li>Đánh giá bằng cross-validation để kết quả ổn định hơn.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("""
     <div class="card">
-        <h3>5. Giá trị thực tiễn mở rộng</h3>
-        <ul>
-            <li>Hỗ trợ dự đoán sớm bệnh nhân có nguy cơ tái nhập viện.</li>
-            <li>Giúp bệnh viện phân bổ nguồn lực tốt hơn.</li>
-            <li>Có thể tích hợp vào hệ thống quản lý bệnh viện thực tế.</li>
-        </ul>
+        <h3>5. Kết luận</h3>
+        <p>Bài toán này là một bài toán <b>phân loại nhị phân</b> với mục tiêu phát hiện bệnh nhân có nguy cơ tái nhập viện sớm. Gaussian Naive Bayes phù hợp để xây dựng mô hình cơ sở nhờ tính đơn giản và tốc độ nhanh. Tuy nhiên, để ứng dụng tốt hơn trong thực tế, cần tiếp tục cải thiện đặc trưng, dữ liệu và thử nghiệm thêm các mô hình mạnh hơn.</p>
     </div>
     """, unsafe_allow_html=True)
