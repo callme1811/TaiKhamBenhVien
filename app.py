@@ -964,15 +964,33 @@ elif page == "Đánh giá hiệu năng":
     with col_left:
         st.markdown("<div class='card'><h3>1. Confusion Matrix</h3></div>", unsafe_allow_html=True)
         fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
-        cm = confusion_matrix(y_test, y_pred)
-        disp = ConfusionMatrixDisplay(
-            confusion_matrix=cm,
-            display_labels=["Không nguy cơ", "Nguy cơ"],
-        )
-        disp.plot(ax=ax_cm, cmap="Blues", colorbar=False)
-        ax_cm.set_title("Ma trận nhầm lẫn", fontsize=14, fontweight="bold")
-        plt.tight_layout()
-        st.pyplot(fig_cm)
+    cm = confusion_matrix(y_test, y_pred)
+
+    disp = ConfusionMatrixDisplay(
+        confusion_matrix=cm,
+        display_labels=["Không nguy cơ", "Nguy cơ"],
+    )
+    disp.plot(ax=ax_cm, cmap="Blues", colorbar=False)
+
+    # 👉 Thêm đoạn này
+    labels = [["TN", "FP"],
+            ["FN", "TP"]]
+
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            ax_cm.text(
+                j, i,
+                f"{labels[i][j]}\n{cm[i, j]}",
+                ha="center",
+                va="center",
+                fontsize=12,
+                fontweight="bold",
+                color="white" if cm[i, j] > cm.max()/2 else "#163b73"
+            )
+
+    ax_cm.set_title("Ma trận nhầm lẫn", fontsize=14, fontweight="bold")
+    plt.tight_layout()
+    st.pyplot(fig_cm)
 
     with col_right:
         st.markdown("<div class='card'><h3>2. ROC Curve</h3></div>", unsafe_allow_html=True)
