@@ -174,7 +174,7 @@ st.markdown(
     <div class="hero-title">Phân loại nguy cơ tái nhập viện sớm của bệnh nhân đái tháo đường bằng Naive Bayes</div>
     <div class="hero-subtitle">
         Ứng dụng hỗ trợ khám phá dữ liệu, dự đoán nguy cơ tái nhập viện sớm và đánh giá hiệu năng mô hình
-        trên hồ sơ bệnh án bằng Streamlit.
+        trên hồ sơ bệnh án .
     </div>
 </div>
 """,
