@@ -970,9 +970,8 @@ elif page == "Đánh giá hiệu năng":
         confusion_matrix=cm,
         display_labels=["Không nguy cơ", "Nguy cơ"],
     )
-    disp.plot(ax=ax_cm, cmap="Blues", colorbar=False)
+    disp.plot(ax=ax_cm, cmap="Blues", colorbar=False, include_values=False)
 
-    # 👉 Thêm đoạn này
     labels = [["TN", "FP"],
             ["FN", "TP"]]
 
