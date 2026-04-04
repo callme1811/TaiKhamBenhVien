@@ -219,8 +219,8 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     if "readmitted" in data.columns:
         data["readmitted"] = data["readmitted"].astype(str).str.strip()
         data["readmitted"] = data["readmitted"].replace({
-            "<30": "YES",
-            ">30": "NO",
+            "<30": "1",
+            ">30": "0",
             "NO": "NO"
         })
 
@@ -543,7 +543,7 @@ if page == "Giới thiệu & EDA":
     <div class="card">
         <h3>1. Thông tin bài toán</h3>
         <p><b>Tên đề tài:</b> Phân loại nguy cơ tái nhập viện sớm của bệnh nhân đái tháo đường bằng Naive Bayes</p>
-        <p><b>Bản chất bài toán:</b> Phân loại nhị phân, trong đó <b>YES</b> là bệnh nhân tái nhập viện sớm, <b>NO</b> là còn lại.</p>
+        <p><b>Bản chất bài toán:</b> Phân loại nhị phân, trong đó <b>1</b> là bệnh nhân tái nhập viện sớm, <b>0</b> là còn lại.</p>
         <p><b>Giá trị thực tiễn:</b> Mô hình hỗ trợ nhận diện sớm bệnh nhân có nguy cơ quay lại bệnh viện trong thời gian ngắn, giúp bác sĩ theo dõi sát hơn và hỗ trợ phân bổ nguồn lực điều trị hợp lý hơn.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -626,8 +626,8 @@ if page == "Giới thiệu & EDA":
     <div class="card">
         <h3>6. Giải thích bài toán</h3>
         <ul>
-            <li><b>YES</b>: bệnh nhân tái nhập viện sớm.</li>
-            <li><b>NO</b>: bệnh nhân không tái nhập viện sớm.</li>
+            <li><b>1</b>: bệnh nhân tái nhập viện sớm.</li>
+            <li><b>0</b>: bệnh nhân không tái nhập viện sớm.</li>
             <li>Mục tiêu của mô hình là phát hiện sớm nhóm nguy cơ để ưu tiên theo dõi.</li>
         </ul>
     </div>
@@ -751,7 +751,7 @@ elif page == "Triển khai mô hình":
 
         prob = model.predict_proba(X_input)[0][1]
         pred = 1 if prob >= threshold else 0
-        pred_label = "YES" if pred == 1 else "NO"
+        pred_label = "1" if pred == 1 else "0"
 
         if note:
             st.info(f"Ghi chú bệnh nhân: {note}")
@@ -759,7 +759,7 @@ elif page == "Triển khai mô hình":
         c1, c2 = st.columns([1.4, 0.6])
 
         with c1:
-            if pred_label == "YES":
+            if pred_label == "1":
                 st.error("Kết quả: Bệnh nhân có nguy cơ tái nhập viện sớm")
             else:
                 st.success("Kết quả: Bệnh nhân không có nguy cơ tái nhập viện sớm")
