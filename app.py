@@ -174,7 +174,7 @@ st.markdown(
     <div class="hero-title">Phân loại nguy cơ tái nhập viện sớm của bệnh nhân đái tháo đường bằng Naive Bayes</div>
     <div class="hero-subtitle">
         Ứng dụng hỗ trợ khám phá dữ liệu, dự đoán nguy cơ tái nhập viện sớm và đánh giá hiệu năng mô hình
-        trên hồ sơ bệnh án .
+        trên hồ sơ bệnh án.
     </div>
 </div>
 """,
@@ -189,6 +189,7 @@ DATA_PATH = "hospital_readmissions.csv"
 MODEL_DIR = "models"
 MODEL_PATH = os.path.join(MODEL_DIR, "multinomial_nb_calibrated_model.pkl")
 PREPROCESSOR_PATH = os.path.join(MODEL_DIR, "preprocessor_nb.pkl")
+TRAIN_COLUMNS_PATH = os.path.join(MODEL_DIR, "train_columns_nb.pkl")
 
 
 # =========================================================
@@ -365,13 +366,46 @@ def clip_input_by_train_range(input_df: pd.DataFrame, X_train: pd.DataFrame, num
     return data
 
 
+
+def ensure_model_input_columns(input_df: pd.DataFrame, reference_columns):
+    data = input_df.copy()
+
+    for col in reference_columns:
+        if col not in data.columns:
+            data[col] = np.nan
+
+    extra_cols = [col for col in data.columns if col not in reference_columns]
+    if extra_cols:
+        data = data.drop(columns=extra_cols)
+
+    return data.reindex(columns=reference_columns)
+
+
+def safe_remove_file(path: str):
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        pass
+
+
+def clear_saved_artifacts():
+    for path in [MODEL_PATH, PREPROCESSOR_PATH, TRAIN_COLUMNS_PATH]:
+        safe_remove_file(path)
+
+
 @st.cache_data
-def load_data():
+def load_raw_data():
     if not os.path.exists(DATA_PATH):
         st.error(f"Không tìm thấy file dữ liệu: {DATA_PATH}")
         st.stop()
 
-    df = pd.read_csv(DATA_PATH)
+    return pd.read_csv(DATA_PATH)
+
+
+@st.cache_data
+def load_data():
+    df = load_raw_data()
     df = clean_raw_data(df)
     return df
 
@@ -494,6 +528,7 @@ def prepare_and_train_model(df: pd.DataFrame):
     os.makedirs(MODEL_DIR, exist_ok=True)
     joblib.dump(model, MODEL_PATH)
     joblib.dump(preprocessor, PREPROCESSOR_PATH)
+    joblib.dump(list(X_train.columns), TRAIN_COLUMNS_PATH)
 
     return model, preprocessor, X_train, X_test, y_train, y_test, categorical_cols, numeric_cols
 
@@ -515,14 +550,24 @@ def load_or_train_model(df: pd.DataFrame):
                 stratify=y,
             )
 
+            if os.path.exists(TRAIN_COLUMNS_PATH):
+                saved_columns = joblib.load(TRAIN_COLUMNS_PATH)
+                X_train = ensure_model_input_columns(X_train, saved_columns)
+                X_test = ensure_model_input_columns(X_test, saved_columns)
+
+            _sample = X_train.head(min(5, len(X_train))).copy()
+            _ = preprocessor.transform(_sample)
+
             return model, preprocessor, X_train, X_test, y_train, y_test, categorical_cols, numeric_cols
         except Exception:
+            clear_saved_artifacts()
             return prepare_and_train_model(df)
 
     return prepare_and_train_model(df)
 
 
-def evaluate_model(model, preprocessor, X_test, y_test, threshold=0.5):
+def evaluate_model(model, preprocessor, X_test, y_test, train_columns, threshold=0.5):
+    X_test = ensure_model_input_columns(X_test, train_columns)
     X_test_processed = preprocessor.transform(X_test)
 
     if hasattr(X_test_processed, "toarray"):
@@ -554,6 +599,7 @@ def evaluate_model(model, preprocessor, X_test, y_test, threshold=0.5):
 # =========================================================
 # LOAD DỮ LIỆU + MODEL
 # =========================================================
+df_raw = load_raw_data()
 df = load_data()
 
 (
@@ -601,7 +647,7 @@ st.sidebar.markdown("**Mã nhãn:** 1 = tái nhập viện sớm, 0 = không tá
 st.sidebar.markdown(f"**Ngưỡng hiện tại:** {threshold:.2f}")
 st.sidebar.markdown(f"**Nguồn dữ liệu:** {DATA_PATH}")
 
-eval_result = evaluate_model(model, preprocessor, X_test, y_test, threshold=threshold)
+eval_result = evaluate_model(model, preprocessor, X_test, y_test, X_train.columns.tolist(), threshold=threshold)
 y_prob = eval_result["y_prob"]
 y_pred = eval_result["y_pred"]
 
@@ -639,12 +685,28 @@ if page == "Giới thiệu & EDA":
     st.dataframe(df.head(10), use_container_width=True)
 
     st.markdown("<div class='card'><h3>3. Kiểm tra dữ liệu thiếu</h3></div>", unsafe_allow_html=True)
-    missing_df = pd.DataFrame({
+
+    raw_missing = pd.DataFrame({
+        "Tên cột": df_raw.columns,
+        "Số giá trị thiếu": df_raw.isnull().sum().values,
+        "Tỷ lệ thiếu (%)": (df_raw.isnull().sum().values / len(df_raw) * 100).round(2),
+    }).sort_values(by="Số giá trị thiếu", ascending=False)
+
+    clean_missing = pd.DataFrame({
         "Tên cột": df.columns,
         "Số giá trị thiếu": df.isnull().sum().values,
         "Tỷ lệ thiếu (%)": (df.isnull().sum().values / len(df) * 100).round(2),
     }).sort_values(by="Số giá trị thiếu", ascending=False)
-    st.dataframe(missing_df, use_container_width=True)
+
+    miss_col1, miss_col2 = st.columns(2)
+    with miss_col1:
+        st.markdown("**Trước xử lý**")
+        st.dataframe(raw_missing.head(15), use_container_width=True)
+    with miss_col2:
+        st.markdown("**Sau xử lý chuẩn hoá giá trị thiếu**")
+        st.dataframe(clean_missing.head(15), use_container_width=True)
+
+    st.caption("Sau khi thay thế các giá trị như '?', 'None', chuỗi rỗng và làm sạch dữ liệu, số lượng giá trị thiếu có thể giảm mạnh hoặc về 0 ở các cột đang dùng cho mô hình.")
 
     st.markdown("<div class='card'><h3>4. Biểu đồ phân tích dữ liệu</h3></div>", unsafe_allow_html=True)
 
@@ -697,7 +759,7 @@ if page == "Giới thiệu & EDA":
                 <li>Dữ liệu gồm cả biến số và biến phân loại.</li>
                 <li>Cột mục tiêu là <b>readmitted</b>, đã được quy đổi thành bài toán nhị phân để phát hiện tái nhập viện sớm.</li>
                 <li>Một số đặc trưng như thời gian nằm viện, số thuốc, số lần nhập viện và số xét nghiệm có thể liên quan đến nguy cơ tái nhập viện.</li>
-                <li>Dữ liệu có giá trị thiếu nên cần bước tiền xử lý trước khi huấn luyện mô hình.</li>
+                <li>Dữ liệu ban đầu có thể chứa giá trị thiếu hoặc ký hiệu thiếu như ?, None, chuỗi rỗng nên cần bước tiền xử lý trước khi huấn luyện mô hình.</li>
             </ul>
         </div>
         """,
@@ -844,6 +906,7 @@ elif page == "Triển khai mô hình":
         input_df = pd.DataFrame([input_data])
         input_df = add_feature_engineering(input_df)
         input_df = clip_input_by_train_range(input_df, X_train, numeric_cols)
+        input_df = ensure_model_input_columns(input_df, X_train.columns.tolist())
 
         X_input = preprocessor.transform(input_df)
         if hasattr(X_input, "toarray"):
@@ -851,7 +914,7 @@ elif page == "Triển khai mô hình":
 
         prob = model.predict_proba(X_input)[0][1]
         pred = 1 if prob >= threshold else 0
-        pred_label = "YES" if pred == 1 else "NO"
+        pred_label = "Nguy cơ" if pred == 1 else "Không nguy cơ"
 
         if note:
             st.info(f"Ghi chú bệnh nhân: {note}")
@@ -859,7 +922,7 @@ elif page == "Triển khai mô hình":
         c1, c2 = st.columns([1.4, 0.6])
 
         with c1:
-            if pred_label == "YES":
+            if pred_label == "Nguy cơ":
                 st.error("Kết quả: Bệnh nhân có nguy cơ tái nhập viện sớm")
             else:
                 st.success("Kết quả: Bệnh nhân không có nguy cơ tái nhập viện sớm")
