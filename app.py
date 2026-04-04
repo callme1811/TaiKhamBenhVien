@@ -1,4 +1,3 @@
-
 import os
 import joblib
 import numpy as np
@@ -260,7 +259,6 @@ def normalize_target_value(value):
     if text in mapping:
         return mapping[text]
 
-    # fallback: nếu là chuỗi số "0.0"/"1.0"
     try:
         num = float(text)
         if num in (0.0, 1.0):
@@ -278,7 +276,6 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     data = data.replace("None", np.nan)
     data = data.replace("", np.nan)
 
-    # Chuẩn hóa vài tên cột hay gặp
     rename_map = {
         "A1Ctest": "A1Cresult",
         "glucose_test": "max_glu_serum",
@@ -289,7 +286,10 @@ def clean_raw_data(df: pd.DataFrame) -> pd.DataFrame:
         "number_inpatient": "n_inpatient",
         "number_emergency": "n_emergency",
     }
-    available_rename = {k: v for k, v in rename_map.items() if k in data.columns and v not in data.columns}
+    available_rename = {
+        k: v for k, v in rename_map.items()
+        if k in data.columns and v not in data.columns
+    }
     if available_rename:
         data = data.rename(columns=available_rename)
 
@@ -366,7 +366,6 @@ def clip_input_by_train_range(input_df: pd.DataFrame, X_train: pd.DataFrame, num
     return data
 
 
-
 def ensure_model_input_columns(input_df: pd.DataFrame, reference_columns):
     data = input_df.copy()
 
@@ -395,19 +394,14 @@ def clear_saved_artifacts():
 
 
 @st.cache_data
-def load_raw_data():
+def load_data():
     if not os.path.exists(DATA_PATH):
         st.error(f"Không tìm thấy file dữ liệu: {DATA_PATH}")
         st.stop()
 
-    return pd.read_csv(DATA_PATH)
-
-
-@st.cache_data
-def load_data():
-    df = load_raw_data()
-    df = clean_raw_data(df)
-    return df
+    df_raw = pd.read_csv(DATA_PATH)
+    df = clean_raw_data(df_raw)
+    return df_raw, df
 
 
 def build_default_values(X_train: pd.DataFrame, numeric_cols, categorical_cols):
@@ -599,8 +593,7 @@ def evaluate_model(model, preprocessor, X_test, y_test, train_columns, threshold
 # =========================================================
 # LOAD DỮ LIỆU + MODEL
 # =========================================================
-df_raw = load_raw_data()
-df = load_data()
+df_raw, df = load_data()
 
 (
     model,
@@ -647,7 +640,14 @@ st.sidebar.markdown("**Mã nhãn:** 1 = tái nhập viện sớm, 0 = không tá
 st.sidebar.markdown(f"**Ngưỡng hiện tại:** {threshold:.2f}")
 st.sidebar.markdown(f"**Nguồn dữ liệu:** {DATA_PATH}")
 
-eval_result = evaluate_model(model, preprocessor, X_test, y_test, X_train.columns.tolist(), threshold=threshold)
+eval_result = evaluate_model(
+    model,
+    preprocessor,
+    X_test,
+    y_test,
+    X_train.columns.tolist(),
+    threshold=threshold,
+)
 y_prob = eval_result["y_prob"]
 y_pred = eval_result["y_pred"]
 
@@ -688,8 +688,10 @@ if page == "Giới thiệu & EDA":
 
     raw_missing = pd.DataFrame({
         "Tên cột": df_raw.columns,
-        "Số giá trị thiếu": df_raw.isnull().sum().values,
-        "Tỷ lệ thiếu (%)": (df_raw.isnull().sum().values / len(df_raw) * 100).round(2),
+        "Số giá trị thiếu": df_raw.replace(["?", "None", ""], np.nan).isnull().sum().values,
+        "Tỷ lệ thiếu (%)": (
+            df_raw.replace(["?", "None", ""], np.nan).isnull().sum().values / len(df_raw) * 100
+        ).round(2),
     }).sort_values(by="Số giá trị thiếu", ascending=False)
 
     clean_missing = pd.DataFrame({
