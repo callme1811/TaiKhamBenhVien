@@ -962,20 +962,18 @@ elif page == "Đánh giá hiệu năng":
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.markdown("<div class='card'><h3>1. Confusion Matrix</h3></div>", unsafe_allow_html=True)
-        fig_cm, ax_cm = plt.subplots(figsize=(10, 5))
-
+     st.markdown("<div class='card'><h3>1. Confusion Matrix</h3></div>", unsafe_allow_html=True)
+    fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
     cm = confusion_matrix(y_test, y_pred)
 
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm,
         display_labels=["Không nguy cơ", "Nguy cơ"],
     )
-
     disp.plot(ax=ax_cm, cmap="Blues", colorbar=False, include_values=False)
 
     labels = [["TN", "FP"],
-            ["FN", "TP"]]
+              ["FN", "TP"]]
 
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
@@ -989,11 +987,22 @@ elif page == "Đánh giá hiệu năng":
                 color="white" if cm[i, j] > cm.max()/2 else "#163b73"
             )
 
-    ax_cm.set_title("Ma trận nhầm lẫn", fontsize=18, fontweight="bold")
-
+    ax_cm.set_title("Ma trận nhầm lẫn", fontsize=14, fontweight="bold")
     plt.tight_layout()
+    st.pyplot(fig_cm)
 
-    st.pyplot(fig_cm, use_container_width=True)
+with col_right:
+    st.markdown("<div class='card'><h3>2. ROC Curve</h3></div>", unsafe_allow_html=True)
+    fig_roc, ax_roc = plt.subplots(figsize=(6, 5))
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    ax_roc.plot(fpr, tpr, label=f"AUC = {eval_result['auc']:.4f}")
+    ax_roc.plot([0, 1], [0, 1], linestyle="--")
+    ax_roc.set_title("Đường cong ROC", fontsize=14, fontweight="bold")
+    ax_roc.set_xlabel("False Positive Rate")
+    ax_roc.set_ylabel("True Positive Rate")
+    ax_roc.legend()
+    plt.tight_layout()
+    st.pyplot(fig_roc)
 
     with col_right:
         st.markdown("<div class='card'><h3>2. ROC Curve</h3></div>", unsafe_allow_html=True)
