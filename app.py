@@ -1004,19 +1004,6 @@ elif page == "Đánh giá hiệu năng":
         plt.tight_layout()
         st.pyplot(fig_roc)
 
-    with col_right:
-        st.markdown("<div class='card'><h3>2. ROC Curve</h3></div>", unsafe_allow_html=True)
-        fig_roc, ax_roc = plt.subplots(figsize=(6, 5))
-        fpr, tpr, _ = roc_curve(y_test, y_prob)
-        ax_roc.plot(fpr, tpr, label=f"AUC = {eval_result['auc']:.4f}")
-        ax_roc.plot([0, 1], [0, 1], linestyle="--")
-        ax_roc.set_title("Đường cong ROC", fontsize=14, fontweight="bold")
-        ax_roc.set_xlabel("False Positive Rate")
-        ax_roc.set_ylabel("True Positive Rate")
-        ax_roc.legend()
-        plt.tight_layout()
-        st.pyplot(fig_roc)
-
     st.markdown("<div class='card'><h3>3. Báo cáo phân loại</h3></div>", unsafe_allow_html=True)
     report_dict = classification_report(
         y_test,
