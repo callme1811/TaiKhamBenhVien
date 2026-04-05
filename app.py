@@ -585,9 +585,6 @@ page = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 threshold = 0.5
-
-
-
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Thông tin mô hình")
 st.sidebar.markdown("**Thuật toán:** Multinomial Naive Bayes + Calibration")
