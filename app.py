@@ -185,7 +185,7 @@ st.markdown(
 # =========================================================
 # HẰNG SỐ
 # =========================================================
-DATA_PATH = "hospital_readmissions.csv"
+DATA_PATH = "data/hospital_readmissions.csv"
 MODEL_DIR = "models"
 MODEL_PATH = os.path.join(MODEL_DIR, "multinomial_nb_calibrated_model.pkl")
 PREPROCESSOR_PATH = os.path.join(MODEL_DIR, "preprocessor_nb.pkl")
