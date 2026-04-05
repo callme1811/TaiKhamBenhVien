@@ -584,13 +584,9 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-threshold = st.sidebar.slider(
-    "Ngưỡng dự đoán",
-    min_value=0.10,
-    max_value=0.90,
-    value=0.50,
-    step=0.05,
-)
+threshold = 0.5
+
+
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Thông tin mô hình")
@@ -598,7 +594,7 @@ st.sidebar.markdown("**Thuật toán:** Multinomial Naive Bayes + Calibration")
 st.sidebar.markdown("**Bài toán:** Phân loại nhị phân")
 st.sidebar.markdown("**Mục tiêu:** Dự đoán tái nhập viện sớm")
 st.sidebar.markdown("**Mã nhãn:** 1 = tái nhập viện sớm, 0 = không tái nhập viện sớm")
-st.sidebar.markdown(f"**Ngưỡng hiện tại:** {threshold:.2f}")
+st.sidebar.markdown("**Ngưỡng dự đoán cố định:** 0.50")
 st.sidebar.markdown(f"**Nguồn dữ liệu:** {DATA_PATH}")
 
 eval_result = evaluate_model(model, preprocessor, X_test, y_test, threshold=threshold)
