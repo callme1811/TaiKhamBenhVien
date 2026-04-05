@@ -1,62 +1,51 @@
-#  Phân loại nguy cơ tái nhập viện bệnh nhân đái tháo đường
+# Phân loại nguy cơ tái nhập viện sớm bằng Naive Bayes
 
-##  Giới thiệu
-Ứng dụng sử dụng Machine Learning (Naive Bayes) để dự đoán nguy cơ tái nhập viện sớm của bệnh nhân dựa trên dữ liệu bệnh án.
+Đây là bản project được giữ theo đúng logic của `app.py` gốc.
 
-Ứng dụng được xây dựng bằng Streamlit nhằm:
-- Khám phá dữ liệu (EDA)
-- Dự đoán nguy cơ tái nhập viện
-- Đánh giá hiệu năng mô hình
+## Lưu ý quan trọng
+- `app.py` là file chính và được giữ đúng theo code gốc.
+- Thư mục `src/` chỉ được tạo thêm để đúng form cấu trúc project như yêu cầu.
+- Khi chạy thực tế, ưu tiên dùng trực tiếp `app.py`.
 
----
-
-##  Công nghệ sử dụng
-- Python
-- Scikit-learn
-- Streamlit
-- Pandas, NumPy
-- Matplotlib
-
----
-
-##  Cấu trúc thư mục
+## Cấu trúc thư mục
 ```
-TaiKhamBenhVien/
+readmission_nb_project_exact/
 ├── app.py
-├── hospital_readmissions.csv
-├── models/
-├── requirements.txt
 ├── README.md
+├── requirements.txt
+├── data/
+│   └── hospital_readmissions.csv
+├── models/
+└── src/
+    ├── __init__.py
+    ├── config.py
+    ├── dataset.py
+    ├── inference.py
+    ├── predict.py
+    ├── preprocessing.py
+    ├── train.py
+    ├── trainer_utils.py
+    └── utils.py
 ```
 
----
-
-##  Cách chạy
+## Cài thư viện
 ```bash
 pip install -r requirements.txt
+```
+
+## Chạy ứng dụng
+```bash
 streamlit run app.py
 ```
 
----
+## Dữ liệu
+Đặt file dữ liệu tại:
+```
+data/hospital_readmissions.csv
+```
 
-##  Deploy Streamlit Cloud
-- Chọn repo GitHub
-- Main file: app.py
-- Nhấn Deploy
-
----
-
-##  Mô hình
-- Multinomial Naive Bayes + Calibration
-- Nhị phân:
-  - 1: Tái nhập viện
-  - 0: Không
-
----
-##  Metrics
-- Accuracy
-- Precision
-- Recall
-- F1-score
-- ROC-AUC
-- Confusion Matrix
+## Mô hình trong app.py
+- Thuật toán: `Multinomial Naive Bayes + CalibratedClassifierCV`
+- Bài toán: phân loại nhị phân
+- Nhãn: `1 = tái nhập viện sớm`, `0 = không tái nhập viện sớm`
+- Ngưỡng dự đoán cố định: `0.50`
