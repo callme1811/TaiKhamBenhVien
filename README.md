@@ -1,5 +1,4 @@
-# Phân loại nguy cơ tái nhập viện sớm bằng Naive Bayes
-
+# Phân loại nguy cơ tái nhập viện sớm từ dữ liệu bệnh án bằng Naive Bayes nhằm hỗ trợ phát hiện bệnh nhân rủi ro cao.
 Mục tiêu của ứng dụng là dự đoán **nguy cơ tái nhập viện sớm** của bệnh nhân đái tháo đường bằng **Multinomial Naive Bayes kết hợp Calibration**.
 
 ## Cấu trúc thư mục
