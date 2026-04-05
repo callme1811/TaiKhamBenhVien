@@ -1,6 +1,6 @@
-# 🏥 Phân loại nguy cơ tái nhập viện bệnh nhân đái tháo đường
+#  Phân loại nguy cơ tái nhập viện bệnh nhân đái tháo đường
 
-## 📌 Giới thiệu
+##  Giới thiệu
 Ứng dụng sử dụng Machine Learning (Naive Bayes) để dự đoán nguy cơ tái nhập viện sớm của bệnh nhân dựa trên dữ liệu bệnh án.
 
 Ứng dụng được xây dựng bằng Streamlit nhằm:
@@ -10,7 +10,7 @@
 
 ---
 
-## ⚙️ Công nghệ sử dụng
+##  Công nghệ sử dụng
 - Python
 - Scikit-learn
 - Streamlit
@@ -19,7 +19,7 @@
 
 ---
 
-## 📂 Cấu trúc thư mục
+##  Cấu trúc thư mục
 ```
 TaiKhamBenhVien/
 ├── app.py
@@ -31,7 +31,7 @@ TaiKhamBenhVien/
 
 ---
 
-## 🚀 Cách chạy
+##  Cách chạy
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
@@ -39,14 +39,14 @@ streamlit run app.py
 
 ---
 
-## 🌐 Deploy Streamlit Cloud
+##  Deploy Streamlit Cloud
 - Chọn repo GitHub
 - Main file: app.py
 - Nhấn Deploy
 
 ---
 
-## 📊 Mô hình
+##  Mô hình
 - Multinomial Naive Bayes + Calibration
 - Nhị phân:
   - 1: Tái nhập viện
@@ -54,7 +54,7 @@ streamlit run app.py
 
 ---
 
-## 📈 Metrics
+##  Metrics
 - Accuracy
 - Precision
 - Recall
