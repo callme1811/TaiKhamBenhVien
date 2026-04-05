@@ -174,7 +174,7 @@ st.markdown(
     <div class="hero-title">Phân loại nguy cơ tái nhập viện sớm của bệnh nhân đái tháo đường bằng Naive Bayes</div>
     <div class="hero-subtitle">
         Ứng dụng hỗ trợ khám phá dữ liệu, dự đoán nguy cơ tái nhập viện sớm và đánh giá hiệu năng mô hình
-        trên hồ sơ bệnh án bằng Streamlit.
+        trên hồ sơ bệnh án.
     </div>
 </div>
 """,
@@ -965,11 +965,28 @@ elif page == "Đánh giá hiệu năng":
         st.markdown("<div class='card'><h3>1. Confusion Matrix</h3></div>", unsafe_allow_html=True)
         fig_cm, ax_cm = plt.subplots(figsize=(6, 5))
         cm = confusion_matrix(y_test, y_pred)
+
         disp = ConfusionMatrixDisplay(
             confusion_matrix=cm,
             display_labels=["Không nguy cơ", "Nguy cơ"],
         )
-        disp.plot(ax=ax_cm, cmap="Blues", colorbar=False)
+        disp.plot(ax=ax_cm, cmap="Blues", colorbar=False, include_values=False)
+
+        labels = [["TN", "FP"],
+                ["FN", "TP"]]
+
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                ax_cm.text(
+                    j, i,
+                    f"{labels[i][j]}\n{cm[i, j]}",
+                    ha="center",
+                    va="center",
+                    fontsize=12,
+                    fontweight="bold",
+                    color="white" if cm[i, j] > cm.max()/2 else "#163b73"
+                )
+
         ax_cm.set_title("Ma trận nhầm lẫn", fontsize=14, fontweight="bold")
         plt.tight_layout()
         st.pyplot(fig_cm)
